@@ -51,8 +51,7 @@ Config file is automatically created on first server start with sensible default
 ## Known Issues
 
 Currently being worked on:
-- Warmup not detecting movement
-- Sleep percentage not fully working
+- Warmup movement detection may not work in all cases
 
 ## Building
 

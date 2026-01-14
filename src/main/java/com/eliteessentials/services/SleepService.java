@@ -5,7 +5,6 @@ import com.hypixel.hytale.builtin.beds.sleep.components.PlayerSleep;
 import com.hypixel.hytale.builtin.beds.sleep.components.PlayerSomnolence;
 import com.hypixel.hytale.builtin.beds.sleep.resources.WorldSlumber;
 import com.hypixel.hytale.builtin.beds.sleep.resources.WorldSomnolence;
-import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
@@ -37,6 +36,7 @@ public class SleepService {
     private final ConfigManager configManager;
     private final ScheduledExecutorService scheduler;
     private volatile boolean slumberTriggered = false;
+    private volatile int lastSleepingCount = -1; // Track to reduce log spam
 
     public SleepService(ConfigManager configManager) {
         this.configManager = configManager;
@@ -82,43 +82,88 @@ public class SleepService {
     }
 
     private void checkWorldSleep(World world, int requiredPercent) {
-        try {
-            // Get players from Universe for this world
-            List<PlayerRef> players = getPlayersInWorld(world);
-            
-            if (players.isEmpty()) {
-                return;
-            }
-            
-            int totalPlayers = players.size();
-            int sleepingPlayers = 0;
-            
-            // Count sleeping players (those in bed, nodding off or in slumber)
-            for (PlayerRef player : players) {
-                if (isPlayerInBed(player)) {
-                    sleepingPlayers++;
+        // Execute the check on the world's thread to properly access entity data
+        world.execute(() -> {
+            try {
+                // Get players from Universe for this world
+                List<PlayerRef> players = getPlayersInWorld(world);
+                
+                if (players.isEmpty()) {
+                    return;
                 }
+                
+                int totalPlayers = players.size();
+                int sleepingPlayers = 0;
+                
+                EntityStore entityStore = world.getEntityStore();
+                Store<EntityStore> store = entityStore.getStore();
+                
+                // Count sleeping players (those in bed, nodding off or in slumber)
+                for (PlayerRef player : players) {
+                    if (isPlayerInBedOnWorldThread(player, store, entityStore)) {
+                        sleepingPlayers++;
+                    }
+                }
+                
+                // Only log when sleeping count changes to reduce spam
+                if (sleepingPlayers != lastSleepingCount && sleepingPlayers > 0) {
+                    logger.info("[SleepService] " + world.getName() + ": " + sleepingPlayers + "/" + totalPlayers + 
+                               " sleeping (need " + requiredPercent + "%)");
+                    lastSleepingCount = sleepingPlayers;
+                } else if (sleepingPlayers == 0 && lastSleepingCount > 0) {
+                    lastSleepingCount = 0;
+                }
+                
+                if (sleepingPlayers == 0) {
+                    slumberTriggered = false;
+                    return;
+                }
+                
+                // Calculate percentage
+                int currentPercent = (sleepingPlayers * 100) / totalPlayers;
+                
+                // Check if threshold is met
+                if (currentPercent >= requiredPercent && !slumberTriggered) {
+                    logger.info("[SleepService] " + sleepingPlayers + "/" + totalPlayers + " sleeping (" + currentPercent + "%) - triggering night skip!");
+                    triggerSlumberOnWorldThread(world, store, sleepingPlayers, totalPlayers, players);
+                    slumberTriggered = true;
+                }
+                
+            } catch (Exception e) {
+                logger.warning("[SleepService] Error checking world sleep: " + e.getMessage());
+            }
+        });
+    }
+    
+    private boolean isPlayerInBedOnWorldThread(PlayerRef player, Store<EntityStore> store, EntityStore entityStore) {
+        try {
+            if (player == null || !player.isValid()) {
+                return false;
             }
             
-            if (sleepingPlayers == 0) {
-                slumberTriggered = false;
-                return;
+            // Get the Ref for this player in the entity store
+            com.hypixel.hytale.component.Ref<EntityStore> ref = entityStore.getRefFromUUID(player.getUuid());
+            if (ref == null) {
+                return false;
             }
             
-            // Calculate percentage
-            int currentPercent = (sleepingPlayers * 100) / totalPlayers;
-            
-            logger.fine("[SleepService] " + world.getName() + ": " + sleepingPlayers + "/" + totalPlayers + 
-                       " sleeping (" + currentPercent + "%, need " + requiredPercent + "%)");
-            
-            // Check if threshold is met
-            if (currentPercent >= requiredPercent && !slumberTriggered) {
-                triggerSlumber(world, sleepingPlayers, totalPlayers, players);
-                slumberTriggered = true;
+            // Check for PlayerSomnolence component on the Store (live data)
+            PlayerSomnolence somnolence = store.getComponent(ref, PlayerSomnolence.getComponentType());
+            if (somnolence == null) {
+                return false;
             }
+            
+            // Check the sleep state
+            PlayerSleep state = somnolence.getSleepState();
+            if (state == null) {
+                return false;
+            }
+            
+            // Player is sleeping if they're in any sleep state (not fully awake)
+            return !(state instanceof PlayerSleep.FullyAwake);
             
         } catch (Exception e) {
-            logger.fine("[SleepService] Error checking world sleep: " + e.getMessage());
+            return false;
         }
     }
     
@@ -144,39 +189,8 @@ public class SleepService {
         return result;
     }
 
-    private boolean isPlayerInBed(PlayerRef player) {
-        try {
-            if (player == null || !player.isValid()) {
-                return false;
-            }
-            
-            Holder<EntityStore> holder = player.getHolder();
-            if (holder == null) {
-                return false;
-            }
-            
-            // Check for PlayerSomnolence component
-            PlayerSomnolence somnolence = holder.getComponent(PlayerSomnolence.getComponentType());
-            if (somnolence == null) {
-                return false;
-            }
-            
-            // Check the sleep state - we want players who are NoddingOff or in Slumber
-            PlayerSleep state = somnolence.getSleepState();
-            if (state == null) {
-                return false;
-            }
-            
-            // Player is sleeping if they're in any sleep state (not fully awake)
-            return !(state instanceof PlayerSleep.FullyAwake);
-            
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private void triggerSlumber(World world, int sleeping, int total, List<PlayerRef> players) {
-        logger.fine("[SleepService] Triggering night skip in " + world.getName() + 
+    private void triggerSlumberOnWorldThread(World world, Store<EntityStore> store, int sleeping, int total, List<PlayerRef> players) {
+        logger.info("[SleepService] Triggering night skip in " + world.getName() + 
                    " (" + sleeping + "/" + total + " sleeping)");
         
         // Notify players
@@ -192,42 +206,32 @@ public class SleepService {
             }
         }
         
-        // Trigger the slumber on the world's thread
-        world.execute(() -> {
-            try {
-                EntityStore entityStore = world.getEntityStore();
-                Store<EntityStore> store = entityStore.getStore();
-                
-                // Get the world time resource to calculate wake-up time
-                WorldTimeResource timeResource = store.getResource(WorldTimeResource.getResourceType());
-                if (timeResource == null) {
-                    logger.warning("[SleepService] Could not get WorldTimeResource");
-                    return;
-                }
-                
-                Instant currentTime = timeResource.getGameTime();
-                
-                // Calculate morning time (skip to 6:00 AM game time)
-                // We need to find the next morning
-                Instant morningTime = calculateNextMorning(currentTime, world);
-                
-                // Create and set the WorldSlumber state (3.0f = animation duration)
-                WorldSlumber slumber = new WorldSlumber(currentTime, morningTime, 3.0f);
-                
-                // Get or create WorldSomnolence resource and set it to slumber
-                WorldSomnolence worldSomnolence = store.getResource(WorldSomnolence.getResourceType());
-                if (worldSomnolence != null) {
-                    worldSomnolence.setState(slumber);
-                    logger.fine("[SleepService] WorldSlumber state set successfully");
-                } else {
-                    logger.warning("[SleepService] WorldSomnolence resource not found");
-                }
-                
-            } catch (Exception e) {
-                logger.warning("[SleepService] Error triggering slumber: " + e.getMessage());
-                e.printStackTrace();
+        try {
+            // Get the world time resource to calculate wake-up time
+            WorldTimeResource timeResource = store.getResource(WorldTimeResource.getResourceType());
+            if (timeResource == null) {
+                logger.warning("[SleepService] Could not get WorldTimeResource");
+                return;
             }
-        });
+            
+            Instant currentTime = timeResource.getGameTime();
+            Instant morningTime = calculateNextMorning(currentTime, world);
+            
+            // Create and set the WorldSlumber state (3.0f = animation duration)
+            WorldSlumber slumber = new WorldSlumber(currentTime, morningTime, 3.0f);
+            
+            // Get WorldSomnolence resource and set it to slumber
+            WorldSomnolence worldSomnolence = store.getResource(WorldSomnolence.getResourceType());
+            if (worldSomnolence != null) {
+                worldSomnolence.setState(slumber);
+                logger.info("[SleepService] Night skip triggered successfully!");
+            } else {
+                logger.warning("[SleepService] WorldSomnolence resource not found");
+            }
+            
+        } catch (Exception e) {
+            logger.warning("[SleepService] Error triggering slumber: " + e.getMessage());
+        }
     }
     
     private Instant calculateNextMorning(Instant currentTime, World world) {
