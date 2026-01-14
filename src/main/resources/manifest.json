@@ -1,0 +1,16 @@
+{
+  "Group": "com.eliteessentials",
+  "Name": "EliteEssentials",
+  "Version": "${version}",
+  "Description": "${description}",
+  "Authors": [
+    {
+      "Name": "EliteScouter"
+    }
+  ],
+  "Main": "com.eliteessentials.EliteEssentials",
+  "ServerVersion": ">=2026.1.0",
+  "Dependencies": {},
+  "OptionalDependencies": {},
+  "DisabledByDefault": false
+}

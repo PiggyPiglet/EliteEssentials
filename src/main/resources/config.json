@@ -1,0 +1,58 @@
+{
+  "_comment": "EliteEssentials Configuration - Edit these values to customize the plugin",
+  
+  "debug": false,
+  
+  "rtp": {
+    "enabled": true,
+    "minRange": 100,
+    "maxRange": 5000,
+    "cooldownSeconds": 30,
+    "warmupSeconds": 3,
+    "maxAttempts": 10,
+    "minSurfaceY": 50
+  },
+  
+  "back": {
+    "enabled": true,
+    "maxHistory": 5,
+    "workOnDeath": true,
+    "cooldownSeconds": 0,
+    "warmupSeconds": 0
+  },
+  
+  "tpa": {
+    "enabled": true,
+    "timeoutSeconds": 30,
+    "warmupSeconds": 3
+  },
+  
+  "homes": {
+    "enabled": true,
+    "maxHomes": 3,
+    "defaultMaxHomes": 3,
+    "cooldownSeconds": 0,
+    "warmupSeconds": 3
+  },
+  
+  "spawn": {
+    "enabled": true,
+    "cooldownSeconds": 0,
+    "warmupSeconds": 3
+  },
+  
+  "sleep": {
+    "enabled": true,
+    "sleepPercentage": 50
+  },
+  
+  "messages": {
+    "prefix": "[EliteEssentials] ",
+    "noPermission": "You don't have permission to use this command.",
+    "playerNotFound": "Player not found.",
+    "commandDisabled": "This command is disabled.",
+    "onCooldown": "You must wait {seconds} seconds before using this command again.",
+    "warmupStarted": "Teleporting in {seconds} seconds. Don't move!",
+    "warmupCancelled": "Teleport cancelled - you moved!"
+  }
+}

@@ -1,0 +1,43 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Local test files
+HytaleServer.jar
+run/
+test-server/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Package files (build outputs should be in releases, not repo)
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration overrides (if any)
+local.properties
+local.gradle

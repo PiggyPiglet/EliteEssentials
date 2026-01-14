@@ -1,0 +1,78 @@
+package com.eliteessentials.commands.hytale;
+
+import com.eliteessentials.services.TpaService;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
+import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+/**
+ * Command: /tpa <player>
+ * Sends a teleport request to another player.
+ */
+public class HytaleTpaCommand extends AbstractPlayerCommand {
+
+    private final TpaService tpaService;
+    private final RequiredArg<PlayerRef> targetArg;
+
+    public HytaleTpaCommand(TpaService tpaService) {
+        super("tpa", "Request to teleport to a player");
+        this.tpaService = tpaService;
+        this.targetArg = withRequiredArg("player", "Target player", ArgTypes.PLAYER_REF);
+    }
+
+    @Override
+    protected boolean canGeneratePermission() {
+        return false;
+    }
+
+    @Override
+    protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, 
+                          PlayerRef player, World world) {
+        PlayerRef target = ctx.get(targetArg);
+        
+        if (target == null) {
+            ctx.sendMessage(Message.raw("Player not found.").color("#FF5555"));
+            return;
+        }
+        
+        // Create teleport request
+        TpaService.Result result = tpaService.createRequest(
+            player.getUuid(),
+            player.getUsername(),
+            target.getUuid(),
+            target.getUsername()
+        );
+        
+        switch (result) {
+            case REQUEST_SENT -> {
+                ctx.sendMessage(Message.join(
+                    Message.raw("Teleport request sent to ").color("#55FF55"),
+                    Message.raw(target.getUsername()).color("#FFFFFF"),
+                    Message.raw(".").color("#55FF55")
+                ));
+                
+                // Send notification to target player with instructions
+                target.sendMessage(Message.join(
+                    Message.raw(player.getUsername()).color("#FFFF55"),
+                    Message.raw(" wants to teleport to you.").color("#AAAAAA")
+                ));
+                target.sendMessage(Message.join(
+                    Message.raw("Type ").color("#AAAAAA"),
+                    Message.raw("/tpaccept").color("#55FF55"),
+                    Message.raw(" or ").color("#AAAAAA"),
+                    Message.raw("/tpdeny").color("#FF5555")
+                ));
+            }
+            case SELF_REQUEST -> ctx.sendMessage(Message.raw("You cannot teleport to yourself.").color("#FF5555"));
+            case ALREADY_PENDING -> ctx.sendMessage(Message.raw("You already have a pending request to this player.").color("#FF5555"));
+            default -> ctx.sendMessage(Message.raw("Could not send teleport request.").color("#FF5555"));
+        }
+    }
+}
