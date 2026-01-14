@@ -87,3 +87,20 @@ Config file is automatically created on first server start with sensible default
 | `/sleeppercent [%]` | Set sleep percentage | Admin |
 
 *Any command can be disabled in config, making it OP-only.*
+
+## Roadmap
+
+Features planned for future releases:
+
+- **Permissions & Groups** - Granular permission system with groups/ranks. Control access to any command per player or group, including commands from other addons.
+- **Chat Prefixes** - Display rank/group prefixes in player names and chat.
+- **Chat Filter** - Configurable word filter with customizable actions (warn, mute, kick).
+- **Spawn Protection** - Protect spawn area from building/breaking with configurable radius.
+- **Player Nicknames** - Allow players to set display names.
+- **MOTD & Announcements** - Customizable join messages and scheduled broadcasts.
+- **AFK Detection** - Auto-kick or mark players as AFK after inactivity.
+- **Vanish** - Allow admins to go invisible to players.
+- **Fly** - Allow admins/players to toggle creative flight.
+- **God Mode** - Allow admins/players to become invincible.
+- **Invsee** - View and edit other players' inventories.
+- **Trashcan** - Dispose of unwanted items.

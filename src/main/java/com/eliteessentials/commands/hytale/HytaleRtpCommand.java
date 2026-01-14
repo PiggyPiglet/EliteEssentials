@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
+import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -26,6 +27,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.util.UUID;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 /**
@@ -35,6 +39,7 @@ import java.util.logging.Logger;
 public class HytaleRtpCommand extends AbstractPlayerCommand {
 
     private static final Logger logger = Logger.getLogger("EliteEssentials");
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     
     private final RtpService rtpService;
     private final BackService backService;
@@ -133,104 +138,139 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
                                   double centerX, double centerZ, Location currentLoc,
                                   PluginConfig.RtpConfig rtpConfig) {
         
-        Random random = new Random();
-        int minRange = rtpConfig.minRange;
-        int maxRange = rtpConfig.maxRange;
+        // Start the async search
+        tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, currentLoc, rtpConfig, 0);
+    }
+    
+    private void tryNextLocation(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
+                                  PlayerRef player, World world, UUID playerId, 
+                                  double centerX, double centerZ, Location currentLoc,
+                                  PluginConfig.RtpConfig rtpConfig, int attempt) {
+        
         int maxAttempts = rtpConfig.maxAttempts;
-        int minSurfaceY = rtpConfig.minSurfaceY;
         boolean debug = configManager.isDebugEnabled();
         
-        if (debug) {
-            logger.info("[RTP] Starting search: minRange=" + minRange + ", maxRange=" + maxRange + 
+        if (attempt >= maxAttempts) {
+            ctx.sendMessage(Message.raw(configManager.getMessage("rtpFailed", "attempts", String.valueOf(maxAttempts))).color("#FF5555"));
+            return;
+        }
+        
+        if (attempt == 0 && debug) {
+            logger.info("[RTP] Starting search: minRange=" + rtpConfig.minRange + ", maxRange=" + rtpConfig.maxRange + 
                        ", center=" + String.format("%.1f, %.1f", centerX, centerZ));
         }
         
-        // Find a valid location
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
-            double angle = random.nextDouble() * 2 * Math.PI;
-            double distance = minRange + random.nextDouble() * (maxRange - minRange);
-            double targetX = centerX + Math.cos(angle) * distance;
-            double targetZ = centerZ + Math.sin(angle) * distance;
-            
-            if (debug) {
-                logger.info("[RTP] Attempt " + (attempt + 1) + ": trying " + 
-                           String.format("%.1f, %.1f", targetX, targetZ) + 
-                           " (distance: " + String.format("%.0f", distance) + ")");
-            }
-            
-            try {
-                long chunkIndex = ChunkUtil.indexChunkFromBlock(targetX, targetZ);
-                
-                // Try to get chunk - first check if loaded, then try async
-                WorldChunk chunk = world.getChunkIfLoaded(chunkIndex);
-                
-                if (chunk == null) {
-                    chunk = world.getChunkIfInMemory(chunkIndex);
-                }
-                
-                if (chunk == null) {
-                    // Try to load chunk asynchronously and wait briefly
-                    try {
-                        chunk = world.getChunkAsync(chunkIndex).get(500, java.util.concurrent.TimeUnit.MILLISECONDS);
-                    } catch (Exception e) {
-                        if (debug) {
-                            logger.info("[RTP] Could not load chunk at " + targetX + ", " + targetZ + ": " + e.getMessage());
-                        }
-                        continue;
-                    }
-                }
-                
-                if (chunk == null) {
-                    if (debug) {
-                        logger.info("[RTP] Chunk null at " + targetX + ", " + targetZ);
-                    }
-                    continue;
-                }
-                
-                int blockX = MathUtil.floor(targetX);
-                int blockZ = MathUtil.floor(targetZ);
-                short surfaceHeight = chunk.getHeight(blockX, blockZ);
-                
-                if (debug) {
-                    logger.info("[RTP] Surface height at " + blockX + ", " + blockZ + " = " + surfaceHeight);
-                }
-                
-                if (surfaceHeight >= minSurfaceY) {
-                    // Found valid location!
-                    final double finalX = targetX;
-                    final double finalY = surfaceHeight + 2;
-                    final double finalZ = targetZ;
-                    
-                    if (debug) {
-                        logger.info("[RTP] Found valid location: " + String.format("%.1f, %.1f, %.1f", finalX, finalY, finalZ));
-                    }
-                    
-                    // Save location for /back
-                    backService.pushLocation(playerId, currentLoc);
-                    
-                    // Teleport
-                    world.execute(() -> {
-                        Vector3d targetPos = new Vector3d(finalX, finalY, finalZ);
-                        Teleport teleport = new Teleport(targetPos, Vector3f.NaN);
-                        store.addComponent(ref, Teleport.getComponentType(), teleport);
-                        
-                        String location = String.format("%.0f, %.0f, %.0f", finalX, finalY, finalZ);
-                        ctx.sendMessage(Message.raw(configManager.getMessage("rtpTeleported", "location", location)).color("#55FF55"));
-                    });
-                    
-                    rtpService.setCooldown(playerId);
-                    return;
-                } else if (debug) {
-                    logger.info("[RTP] Surface too low: " + surfaceHeight + " < " + minSurfaceY);
-                }
-            } catch (Exception e) {
-                if (debug) {
-                    logger.warning("[RTP] Error on attempt " + (attempt + 1) + ": " + e.getMessage());
-                }
-                continue;
-            }
+        Random random = new Random();
+        double angle = random.nextDouble() * 2 * Math.PI;
+        double distance = rtpConfig.minRange + random.nextDouble() * (rtpConfig.maxRange - rtpConfig.minRange);
+        double targetX = centerX + Math.cos(angle) * distance;
+        double targetZ = centerZ + Math.sin(angle) * distance;
+        
+        if (debug) {
+            logger.info("[RTP] Attempt " + (attempt + 1) + ": trying " + 
+                       String.format("%.1f, %.1f", targetX, targetZ) + 
+                       " (distance: " + String.format("%.0f", distance) + ")");
         }
         
-        ctx.sendMessage(Message.raw(configManager.getMessage("rtpFailed", "attempts", String.valueOf(maxAttempts))).color("#FF5555"));
+        long chunkIndex = ChunkUtil.indexChunkFromBlock(targetX, targetZ);
+        
+        // Check if already loaded first (fast path)
+        WorldChunk chunk = world.getChunkIfLoaded(chunkIndex);
+        if (chunk == null) {
+            chunk = world.getChunkIfInMemory(chunkIndex);
+        }
+        
+        if (chunk != null) {
+            // Already loaded - process immediately
+            processChunk(ctx, store, ref, player, world, playerId, centerX, centerZ, 
+                        currentLoc, rtpConfig, attempt, targetX, targetZ, chunk);
+        } else {
+            // Load async with callback - NO BLOCKING
+            final int currentAttempt = attempt;
+            final double finalTargetX = targetX;
+            final double finalTargetZ = targetZ;
+            
+            world.getChunkAsync(chunkIndex).whenComplete((loadedChunk, error) -> {
+                if (error != null || loadedChunk == null) {
+                    if (debug) {
+                        logger.info("[RTP] Failed to load chunk: " + (error != null ? error.getMessage() : "null"));
+                    }
+                    // Try next location on game thread
+                    world.execute(() -> {
+                        tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, 
+                                       currentLoc, rtpConfig, currentAttempt + 1);
+                    });
+                } else {
+                    // Process on game thread
+                    world.execute(() -> {
+                        processChunk(ctx, store, ref, player, world, playerId, centerX, centerZ, 
+                                    currentLoc, rtpConfig, currentAttempt, finalTargetX, finalTargetZ, loadedChunk);
+                    });
+                }
+            });
+        }
+    }
+    
+    private void processChunk(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
+                               PlayerRef player, World world, UUID playerId,
+                               double centerX, double centerZ, Location currentLoc,
+                               PluginConfig.RtpConfig rtpConfig, int attempt,
+                               double targetX, double targetZ, WorldChunk chunk) {
+        boolean debug = configManager.isDebugEnabled();
+        int blockX = MathUtil.floor(targetX);
+        int blockZ = MathUtil.floor(targetZ);
+        
+        short surfaceHeight = chunk.getHeight(blockX, blockZ);
+        
+        if (debug) {
+            logger.info("[RTP] Surface height at " + blockX + ", " + blockZ + " = " + surfaceHeight);
+        }
+        
+        if (surfaceHeight > 0) {
+            double finalY = surfaceHeight + 2;
+            executeTeleport(ctx, store, ref, world, playerId, currentLoc, rtpConfig, targetX, finalY, targetZ);
+        } else {
+            // Invalid surface, try next
+            if (debug) {
+                logger.info("[RTP] Invalid surface height: " + surfaceHeight + ", trying next");
+            }
+            tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, 
+                           currentLoc, rtpConfig, attempt + 1);
+        }
+    }
+    
+    private void executeTeleport(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
+                                  World world, UUID playerId, Location currentLoc,
+                                  PluginConfig.RtpConfig rtpConfig,
+                                  double teleportX, double teleportY, double teleportZ) {
+        boolean debug = configManager.isDebugEnabled();
+        
+        if (debug) {
+            logger.info("[RTP] Teleporting to: " + String.format("%.1f, %.1f, %.1f", teleportX, teleportY, teleportZ));
+        }
+        
+        // Save location for /back
+        backService.pushLocation(playerId, currentLoc);
+        
+        int invulnerabilitySeconds = rtpConfig.invulnerabilitySeconds;
+        
+        Vector3d targetPos = new Vector3d(teleportX, teleportY, teleportZ);
+        Teleport teleport = new Teleport(targetPos, Vector3f.NaN);
+        store.addComponent(ref, Teleport.getComponentType(), teleport);
+        
+        if (invulnerabilitySeconds > 0) {
+            store.addComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE);
+            
+            scheduler.schedule(() -> {
+                world.execute(() -> {
+                    store.removeComponent(ref, Invulnerable.getComponentType());
+                });
+            }, invulnerabilitySeconds, TimeUnit.SECONDS);
+        }
+        
+        String location = String.format("%.0f, %.0f, %.0f", teleportX, teleportY, teleportZ);
+        ctx.sendMessage(Message.raw(configManager.getMessage("rtpTeleported", "location", location)).color("#55FF55"));
+        
+        rtpService.setCooldown(playerId);
     }
 }

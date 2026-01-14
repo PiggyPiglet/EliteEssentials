@@ -91,6 +91,9 @@ public class HomeService {
             return Result.HOME_NOT_FOUND;
         }
         
+        // Persist the change to disk
+        storage.save();
+        
         logger.info("Player " + playerId + " deleted home '" + name + "'");
         return Result.SUCCESS;
     }

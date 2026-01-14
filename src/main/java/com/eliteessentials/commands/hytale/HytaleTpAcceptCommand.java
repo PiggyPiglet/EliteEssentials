@@ -9,7 +9,6 @@ import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.TpaService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.util.CommandPermissionUtil;
-import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -25,7 +24,7 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -63,27 +62,62 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
         UUID playerId = player.getUuid();
         
-        Optional<TpaRequest> requestOpt = tpaService.acceptRequest(playerId);
-
-        if (requestOpt.isEmpty()) {
+        // First, peek at the pending request WITHOUT removing it
+        List<TpaRequest> pendingRequests = tpaService.getPendingRequests(playerId);
+        
+        if (pendingRequests.isEmpty()) {
             ctx.sendMessage(Message.raw(configManager.getMessage("tpaNoPending")).color("#FF5555"));
             return;
         }
 
-        TpaRequest request = requestOpt.get();
+        // Get the most recent request (last in list)
+        TpaRequest request = pendingRequests.get(pendingRequests.size() - 1);
         
         if (request.isExpired()) {
             ctx.sendMessage(Message.raw(configManager.getMessage("tpaExpired")).color("#FF5555"));
             return;
         }
 
-        // Get the requester player from the server
+        // Get the requester player from the server - validate BEFORE accepting
         PlayerRef requester = Universe.get().getPlayer(request.getRequesterId());
         
         if (requester == null || !requester.isValid()) {
+            // Remove the invalid request so player can accept other requests
+            tpaService.denyRequestFrom(playerId, request.getRequesterId());
             ctx.sendMessage(Message.raw(configManager.getMessage("tpaPlayerOffline", "player", request.getRequesterName())).color("#FF5555"));
             return;
         }
+        
+        // Get requester's ref and store directly from PlayerRef (like Essentials does)
+        Ref<EntityStore> requesterRef = requester.getReference();
+        
+        if (requesterRef == null || !requesterRef.isValid()) {
+            // Remove the invalid request
+            tpaService.denyRequestFrom(playerId, request.getRequesterId());
+            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotFindRequester")).color("#FF5555"));
+            return;
+        }
+        
+        Store<EntityStore> requesterStore = requesterRef.getStore();
+        if (requesterStore == null) {
+            tpaService.denyRequestFrom(playerId, request.getRequesterId());
+            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotFindRequester")).color("#FF5555"));
+            return;
+        }
+        
+        // Get requester's transform from store/ref (not holder - holder may be null for remote players)
+        TransformComponent requesterTransform = (TransformComponent) requesterStore.getComponent(requesterRef, TransformComponent.getComponentType());
+        if (requesterTransform == null) {
+            // Remove the invalid request
+            tpaService.denyRequestFrom(playerId, request.getRequesterId());
+            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotGetRequesterPosition")).color("#FF5555"));
+            return;
+        }
+        
+        // Get target world from the store's external data
+        EntityStore requesterEntityStore = requesterStore.getExternalData();
+        World requesterWorld = requesterEntityStore != null ? requesterEntityStore.getWorld() : world;
+        final World finalRequesterWorld = requesterWorld != null ? requesterWorld : world;
         
         // Get target (acceptor's) position
         TransformComponent targetTransform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
@@ -94,39 +128,12 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         
         Vector3d targetPos = targetTransform.getPosition();
         
-        // Get requester's current position for warmup and /back
-        Holder<EntityStore> requesterHolder = requester.getHolder();
-        if (requesterHolder == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotFindRequester")).color("#FF5555"));
-            return;
-        }
-        
-        TransformComponent requesterTransform = requesterHolder.getComponent(TransformComponent.getComponentType());
-        if (requesterTransform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotGetRequesterPosition")).color("#FF5555"));
-            return;
-        }
+        // NOW that all validations passed, officially accept (remove) the request
+        tpaService.acceptRequestFrom(playerId, request.getRequesterId());
         
         Vector3d requesterPos = requesterTransform.getPosition();
-        HeadRotation reqHeadRot = requesterHolder.getComponent(HeadRotation.getComponentType());
+        HeadRotation reqHeadRot = (HeadRotation) requesterStore.getComponent(requesterRef, HeadRotation.getComponentType());
         Vector3f reqRot = reqHeadRot != null ? reqHeadRot.getRotation() : new Vector3f(0, 0, 0);
-        
-        // Get requester's world
-        World requesterWorld = Universe.get().getWorld(requester.getWorldUuid());
-        if (requesterWorld == null) {
-            requesterWorld = world;
-        }
-        final World finalRequesterWorld = requesterWorld;
-        
-        // Get requester's store and ref for warmup
-        EntityStore requesterEntityStore = finalRequesterWorld.getEntityStore();
-        Store<EntityStore> requesterStore = requesterEntityStore.getStore();
-        Ref<EntityStore> requesterRef = requesterEntityStore.getRefFromUUID(request.getRequesterId());
-        
-        if (requesterRef == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotFindRequester")).color("#FF5555"));
-            return;
-        }
 
         // Save requester's location for /back
         String worldName = finalRequesterWorld.getName();
@@ -140,15 +147,10 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         Runnable doTeleport = () -> {
             backService.pushLocation(request.getRequesterId(), requesterLoc);
             
-            finalRequesterWorld.execute(() -> {
-                try {
-                    Teleport teleport = new Teleport(world, targetPos, Vector3f.NaN);
-                    requesterStore.addComponent(requesterRef, Teleport.getComponentType(), teleport);
-                    logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
-                } catch (Exception e) {
-                    logger.warning("[TPA] Error teleporting: " + e.getMessage());
-                }
-            });
+            // Teleport using putComponent like Essentials does
+            Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, 0, 0));
+            requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
+            logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
             
             requester.sendMessage(Message.raw(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername())).color("#55FF55"));
         };

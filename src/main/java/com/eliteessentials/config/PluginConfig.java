@@ -152,6 +152,15 @@ public class PluginConfig {
         
         /** Minimum Y level - rejects locations below this (avoid dungeons) */
         public int minSurfaceY = 50;
+        
+        /** Timeout in milliseconds for loading unloaded chunks (0 = skip unloaded chunks) */
+        public int chunkLoadTimeoutMs = 500;
+        
+        /** Default Y height to use when chunk is not loaded (0 = skip unloaded chunks) */
+        public int defaultHeight = 128;
+        
+        /** Seconds of invulnerability after RTP to prevent fall damage (0 = disabled) */
+        public int invulnerabilitySeconds = 5;
     }
 
     // ==================== BACK ====================
