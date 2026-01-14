@@ -226,7 +226,6 @@ public class WarmupService {
         private final Vector3d startPosition;
         private final Runnable onComplete;
         private final String commandName;
-        private final int durationSeconds;
         private final World world;
         private final Store<EntityStore> store;
         private final Ref<EntityStore> ref;
@@ -240,7 +239,6 @@ public class WarmupService {
             this.startPosition = startPosition;
             this.onComplete = onComplete;
             this.commandName = commandName;
-            this.durationSeconds = durationSeconds;
             this.world = world;
             this.store = store;
             this.ref = ref;
@@ -250,7 +248,6 @@ public class WarmupService {
         Vector3d getStartPosition() { return startPosition; }
         Runnable getOnComplete() { return onComplete; }
         String getCommandName() { return commandName; }
-        int getDurationSeconds() { return durationSeconds; }
         World getWorld() { return world; }
         Store<EntityStore> getStore() { return store; }
         Ref<EntityStore> getRef() { return ref; }

@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 
 /**
  * Service for random teleportation functionality.
@@ -15,7 +14,6 @@ import java.util.logging.Logger;
  */
 public class RtpService {
 
-    private static final Logger logger = Logger.getLogger("EliteEssentials");
     private static final Random random = new Random();
 
     private final ConfigManager configManager;

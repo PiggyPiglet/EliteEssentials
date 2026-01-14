@@ -33,7 +33,6 @@ import java.util.logging.Logger;
 public class SleepService {
 
     private static final Logger logger = Logger.getLogger("EliteEssentials");
-    private static final float SLUMBER_DURATION_SECONDS = 3.0f; // How long the sleep animation takes
 
     private final ConfigManager configManager;
     private final ScheduledExecutorService scheduler;
@@ -212,8 +211,8 @@ public class SleepService {
                 // We need to find the next morning
                 Instant morningTime = calculateNextMorning(currentTime, world);
                 
-                // Create and set the WorldSlumber state
-                WorldSlumber slumber = new WorldSlumber(currentTime, morningTime, SLUMBER_DURATION_SECONDS);
+                // Create and set the WorldSlumber state (3.0f = animation duration)
+                WorldSlumber slumber = new WorldSlumber(currentTime, morningTime, 3.0f);
                 
                 // Get or create WorldSomnolence resource and set it to slumber
                 WorldSomnolence worldSomnolence = store.getResource(WorldSomnolence.getResourceType());

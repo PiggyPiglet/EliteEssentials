@@ -43,8 +43,6 @@ public class DeathTrackingService {
     private final Map<UUID, Location> lastKnownPositions = new ConcurrentHashMap<>();
     // Track the "stable" position before any death event (the one we want to save)
     private final Map<UUID, Location> stablePositions = new ConcurrentHashMap<>();
-    // Track when we last updated position
-    private final Map<UUID, Long> lastUpdateTime = new ConcurrentHashMap<>();
     // Track if player was valid last check (to detect death/disconnect)
     private final Map<UUID, Boolean> wasValid = new ConcurrentHashMap<>();
     // Track if we already saved death location for this "death session"
@@ -191,7 +189,6 @@ public class DeathTrackingService {
                 }
                 
                 lastKnownPositions.put(playerId, newPos);
-                lastUpdateTime.put(playerId, System.currentTimeMillis());
             }
         }
     }
@@ -250,7 +247,6 @@ public class DeathTrackingService {
         trackedPlayers.remove(playerId);
         lastKnownPositions.remove(playerId);
         stablePositions.remove(playerId);
-        lastUpdateTime.remove(playerId);
         wasValid.remove(playerId);
         deathLocationSaved.remove(playerId);
     }
