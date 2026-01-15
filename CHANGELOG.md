@@ -8,6 +8,9 @@ All notable changes to EliteEssentials will be documented in this file.
 - **LuckPerms Integration**: All 52 EliteEssentials permissions are now automatically registered with LuckPerms for autocomplete and discovery in the web editor and commands
 - Permissions appear in LuckPerms dropdown immediately on server start (no need to use commands first)
 
+### Fixed
+- **`/sleeppercent` permission check**: Command was missing permission validation, allowing any player to use it. Now properly requires admin permission (simple mode) or `eliteessentials.command.misc.sleeppercent` (advanced mode)
+
 ## [1.0.2] - 2026-01-15
 
 ### Added

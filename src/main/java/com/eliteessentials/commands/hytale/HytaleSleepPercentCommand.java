@@ -1,7 +1,9 @@
 package com.eliteessentials.commands.hytale;
 
+import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
+import com.eliteessentials.util.CommandPermissionUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -44,6 +46,12 @@ public class HytaleSleepPercentCommand extends AbstractPlayerCommand {
     @Override
     protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, 
                           PlayerRef player, World world) {
+        // Check admin permission
+        boolean enabled = configManager.getConfig().sleep.enabled;
+        if (!CommandPermissionUtil.canExecuteAdmin(ctx, player, Permissions.SLEEPPERCENT, enabled)) {
+            return;
+        }
+        
         // Show current percentage
         int current = configManager.getConfig().sleep.sleepPercentage;
         ctx.sendMessage(Message.join(
@@ -77,6 +85,12 @@ public class HytaleSleepPercentCommand extends AbstractPlayerCommand {
         @Override
         protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
                               PlayerRef player, World world) {
+            // Check admin permission
+            boolean enabled = configManager.getConfig().sleep.enabled;
+            if (!CommandPermissionUtil.canExecuteAdmin(ctx, player, Permissions.SLEEPPERCENT, enabled)) {
+                return;
+            }
+            
             int percent = ctx.get(percentArg);
             
             // Validate range
