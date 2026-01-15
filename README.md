@@ -4,7 +4,7 @@ A server-side essentials plugin for Hytale that provides essential teleportation
 
 ## Features
 
-### 🌍 Full Localization Support
+### Full Localization Support
 All 60+ player-facing messages are configurable in `config.json`. Translate your server to any language!
 
 - Placeholder support: `{player}`, `{seconds}`, `{name}`, `{count}`, `{max}`, `{location}`
@@ -97,7 +97,7 @@ EliteEssentials supports two permission modes via `advancedPermissions` in confi
 - **Everyone** commands work for all players
 - **Admin** commands require OP or `eliteessentials.admin.*`
 
-### Advanced Mode
+### Advanced Mode (LuckPerm Compatible!)
 Full granular permissions following `eliteessentials.command.<category>.<action>` structure:
 
 | Category | Example Permissions |
@@ -112,17 +112,14 @@ See [PERMISSIONS.md](PERMISSIONS.md) for the complete permission reference.
 
 ## Roadmap
 
-Features planned for future releases:
-
-- **Permissions & Groups** - Granular permission system with groups/ranks. Control access to any command per player or group, including commands from other addons.
-- **Chat Prefixes** - Display rank/group prefixes in player names and chat.
-- **Chat Filter** - Configurable word filter with customizable actions (warn, mute, kick).
-- **Spawn Protection** - Protect spawn area from building/breaking with configurable radius.
-- **Player Nicknames** - Allow players to set display names.
-- **MOTD & Announcements** - Customizable join messages and scheduled broadcasts.
-- **AFK Detection** - Auto-kick or mark players as AFK after inactivity.
-- **Vanish** - Allow admins to go invisible to players.
-- **Fly** - Allow admins/players to toggle creative flight.
-- **God Mode** - Allow admins/players to become invincible.
-- **Invsee** - View and edit other players' inventories.
-- **Trashcan** - Dispose of unwanted items.
+*   **Chat Filter** - Configurable word filter with customizable actions (warn, mute, kick).
+*   **Spawn Protection** - Protect spawn area from building/breaking with configurable radius.
+*   **Player Nicknames** - Allow players to set display names.
+*   **MOTD & Announcements** - Customizable join messages and scheduled broadcasts.
+*   **AFK Detection** - Auto-kick or mark players as AFK after inactivity.
+*   **Vanish** - Allow admins to go invisible to players.
+*   **Fly** - Allow admins/players to toggle creative flight.
+*   **God Mode** - Allow admins/players to become invincible.
+*   **Invsee** - View and edit other players' inventories.
+*   **Trashcan** - Dispose of unwanted items.
+*   **MSG** - Ability to message people
