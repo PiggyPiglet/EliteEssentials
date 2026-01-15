@@ -67,8 +67,8 @@ Config file is automatically created on first server start with sensible default
 
 ## Commands Summary
 
-| Command | Description | Permission |
-|---------|-------------|------------|
+| Command | Description | Access |
+|---------|-------------|--------|
 | `/home [name]` | Teleport to home | Everyone |
 | `/sethome [name]` | Set a home | Everyone |
 | `/delhome [name]` | Delete a home | Everyone |
@@ -85,8 +85,30 @@ Config file is automatically created on first server start with sensible default
 | `/delwarp <name>` | Delete warp | Admin |
 | `/warpadmin` | Warp admin panel | Admin |
 | `/sleeppercent [%]` | Set sleep percentage | Admin |
+| `/eliteessentials reload` | Reload configuration | Admin |
 
-*Any command can be disabled in config, making it OP-only.*
+*In simple mode (default), "Everyone" commands work for all players, "Admin" requires OP.*
+
+## Permissions
+
+EliteEssentials supports two permission modes via `advancedPermissions` in config.json:
+
+### Simple Mode (Default)
+- **Everyone** commands work for all players
+- **Admin** commands require OP or `eliteessentials.admin.*`
+
+### Advanced Mode
+Full granular permissions following `eliteessentials.command.<category>.<action>` structure:
+
+| Category | Example Permissions |
+|----------|---------------------|
+| Home | `command.home.home`, `command.home.sethome`, `command.home.limit.5` |
+| Teleport | `command.tp.tpa`, `command.tp.back`, `command.tp.back.ondeath` |
+| Warp | `command.warp.use`, `command.warp.<warpname>` |
+| Spawn | `command.spawn.use` |
+| Bypass | `command.home.bypass.cooldown`, `command.tp.bypass.warmup` |
+
+See [PERMISSIONS.md](PERMISSIONS.md) for the complete permission reference.
 
 ## Roadmap
 
