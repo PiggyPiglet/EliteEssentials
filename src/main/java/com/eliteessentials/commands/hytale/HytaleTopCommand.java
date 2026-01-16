@@ -55,8 +55,8 @@ public class HytaleTopCommand extends AbstractPlayerCommand {
                           PlayerRef player, World world) {
         UUID playerId = player.getUuid();
         
-        // Check permission
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.TOP, 
+        // Check permission (Admin command)
+        if (!CommandPermissionUtil.canExecuteAdmin(ctx, player, Permissions.TOP, 
                 configManager.getConfig().top.enabled)) {
             return;
         }

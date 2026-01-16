@@ -129,7 +129,7 @@ Config file is automatically created on first server start with sensible default
 | <code>/kit</code>            |Open kit selection GUI      |Everyone   |
 | <code>/msg &lt;player&gt; &lt;msg&gt;</code> |Private message             |Everyone   |
 | <code>/reply &lt;msg&gt;</code> |Reply to last message       |Everyone   |
-| <code>/top</code>            |Teleport to highest block   |Everyone   |
+| <code>/top</code>            |Teleport to highest block   |Admin      |
 | <code>/god</code>            |Toggle invincibility        |Admin      |
 | <code>/heal</code>           |Restore full health         |Admin      |
 | <code>/fly</code>            |Toggle flight mode          |Admin      |

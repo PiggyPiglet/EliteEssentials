@@ -45,8 +45,8 @@ public class HytaleGodCommand extends AbstractPlayerCommand {
                           PlayerRef player, World world) {
         UUID playerId = player.getUuid();
         
-        // Check permission
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.GOD, 
+        // Check permission (Admin command)
+        if (!CommandPermissionUtil.canExecuteAdmin(ctx, player, Permissions.GOD, 
                 configManager.getConfig().god.enabled)) {
             return;
         }

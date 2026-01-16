@@ -37,8 +37,8 @@ public class HytaleFlyCommand extends AbstractPlayerCommand {
     @Override
     protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
                           PlayerRef player, World world) {
-        // Check permission
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.FLY, 
+        // Check permission (Admin command)
+        if (!CommandPermissionUtil.canExecuteAdmin(ctx, player, Permissions.FLY, 
                 configManager.getConfig().fly.enabled)) {
             return;
         }

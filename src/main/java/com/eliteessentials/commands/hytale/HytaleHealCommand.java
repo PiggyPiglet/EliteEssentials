@@ -39,8 +39,8 @@ public class HytaleHealCommand extends AbstractPlayerCommand {
     @Override
     protected void execute(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
                           PlayerRef player, World world) {
-        // Check permission
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.HEAL, 
+        // Check permission (Admin command)
+        if (!CommandPermissionUtil.canExecuteAdmin(ctx, player, Permissions.HEAL, 
                 configManager.getConfig().heal.enabled)) {
             return;
         }
