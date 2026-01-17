@@ -145,7 +145,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             warmupService.startWarmup(player, currentPos, warmupSeconds, afterWarmup, COMMAND_NAME, world, store, ref);
         } else {
             // No warmup, search and teleport immediately
-            ctx.sendMessage(Message.raw(configManager.getMessage("rtpSearching")).color("#AAAAAA"));
+            ctx.sendMessage(Message.raw("Searching for a safe location...").color("#AAAAAA"));
             findAndTeleport(ctx, store, ref, player, world, playerId, centerX, centerZ, currentLoc, rtpConfig);
         }
     }
@@ -251,45 +251,25 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         int blockX = MathUtil.floor(targetX);
         int blockZ = MathUtil.floor(targetZ);
         
-        // Try to find safe Y using chunk's height map
-        Integer safeY = null;
+        // Find the actual highest solid block (like /top command does)
+        Integer groundY = findHighestSolidBlock(chunk, blockX, blockZ, rtpConfig.minSurfaceY);
         
-        try {
-            // Try getHeight with local coordinates
-            int localX = blockX & 15;
-            int localZ = blockZ & 15;
-            short height = chunk.getHeight(localX, localZ);
-            
+        if (groundY == null) {
             if (debug) {
-                logger.info("[RTP] Chunk height at world(" + blockX + ", " + blockZ + ") local(" + localX + ", " + localZ + ") = " + height);
+                logger.info("[RTP] No solid ground found at (" + blockX + ", " + blockZ + "), trying next location");
             }
-            
-            // Only use height if it's reasonable (between minSurfaceY and 256)
-            if (height >= rtpConfig.minSurfaceY && height < 256) {
-                safeY = (int) height;
-            }
-        } catch (Exception e) {
-            if (debug) {
-                logger.info("[RTP] getHeight failed: " + e.getMessage());
-            }
+            ctx.sendMessage(Message.raw(configManager.getMessage("rtpSearching")).color("#AAAAAA"));
+            tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, 
+                           currentLoc, rtpConfig, attempt + 1);
+            return;
         }
         
-        // If getHeight didn't give a valid result, use player's current Y as reference
-        // This assumes the player is standing on valid ground
-        if (safeY == null) {
-            safeY = (int) currentLoc.getY();
-            if (debug) {
-                logger.info("[RTP] Using player's current Y as fallback: " + safeY);
-            }
+        if (debug) {
+            logger.info("[RTP] Found solid ground at Y=" + groundY);
         }
         
-        // Ensure we're above minimum surface level
-        if (safeY < rtpConfig.minSurfaceY) {
-            safeY = rtpConfig.minSurfaceY;
-        }
-        
-        // Teleport 2 blocks above the ground
-        double teleportY = safeY + 2;
+        // Teleport 1 block above the ground (player's feet at groundY + 1)
+        double teleportY = groundY + 1;
         
         if (debug) {
             logger.info("[RTP] Final teleport Y: " + teleportY);
@@ -303,7 +283,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             if (debug) {
                 logger.info("[RTP] Location rejected - unsafe (water/lava detected)");
             }
-            ctx.sendMessage(Message.raw("Searching for safe location...").color("#AAAAAA"));
+            ctx.sendMessage(Message.raw(configManager.getMessage("rtpSearching")).color("#AAAAAA"));
             
             // Try next location
             tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, 
@@ -317,6 +297,27 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         
         executeTeleport(ctx, store, ref, world, playerId, currentLoc, rtpConfig, 
                        targetX, teleportY, targetZ);
+    }
+    
+    /**
+     * Finds the highest solid block at the given X/Z position.
+     * Scans from top to bottom like the /top command.
+     * 
+     * @return Y coordinate of highest solid block, or null if none found
+     */
+    private Integer findHighestSolidBlock(WorldChunk chunk, int x, int z, int minY) {
+        // Start from a reasonable max height and scan down
+        for (int y = 255; y >= minY; y--) {
+            try {
+                BlockType blockType = chunk.getBlockType(x, y, z);
+                if (blockType != null && blockType.getMaterial() == BlockMaterial.Solid) {
+                    return y;
+                }
+            } catch (Exception e) {
+                // Continue scanning if we hit an error
+            }
+        }
+        return null;
     }
     
     /**
@@ -334,8 +335,9 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             // Use reflection to call getFluidId
             Method getFluidIdMethod = chunk.getClass().getMethod("getFluidId", int.class, int.class, int.class);
             
-            // Check feet level (y) and head level (y+1)
-            for (int yOffset = 0; yOffset <= 1; yOffset++) {
+            // Check a wider vertical range to catch lava above water, etc.
+            // Check from 2 blocks below to 3 blocks above the teleport point
+            for (int yOffset = -2; yOffset <= 3; yOffset++) {
                 int checkY = y + yOffset;
                 if (checkY < 0 || checkY >= 256) continue;
                 
@@ -349,23 +351,30 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
                     if (fluidId == 6 || fluidId == 7) {
                         if (debug) {
                             String fluidType = (fluidId == 6) ? "LAVA" : "WATER";
-                            logger.info("[RTP-SAFETY] " + fluidType + " detected at Y+" + yOffset + " (" + checkY + "): FluidId=" + fluidId);
+                            logger.info("[RTP-SAFETY] " + fluidType + " detected at Y" + (yOffset >= 0 ? "+" : "") + yOffset + " (" + checkY + "): FluidId=" + fluidId);
                         }
-                        return false; // Unsafe - has lava or water
+                        return false; // Unsafe - has lava or water in the area
                     }
                 }
             }
             
-            // Also check the block below (y-1) to ensure we're not standing on water/lava surface
-            Object fluidIdBelow = getFluidIdMethod.invoke(chunk, x, y - 1, z);
-            if (fluidIdBelow instanceof Integer) {
-                int fluidId = (Integer) fluidIdBelow;
-                if (fluidId == 6 || fluidId == 7) {
-                    if (debug) {
-                        String fluidType = (fluidId == 6) ? "LAVA" : "WATER";
-                        logger.info("[RTP-SAFETY] " + fluidType + " detected below at Y-1 (" + (y-1) + "): FluidId=" + fluidId);
+            // Also check horizontally adjacent blocks at the teleport level
+            // This catches pools/lakes next to the spawn point
+            int[][] offsets = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (int[] offset : offsets) {
+                int checkX = x + offset[0];
+                int checkZ = z + offset[1];
+                
+                Object fluidIdObj = getFluidIdMethod.invoke(chunk, checkX, y, checkZ);
+                if (fluidIdObj instanceof Integer) {
+                    int fluidId = (Integer) fluidIdObj;
+                    if (fluidId == 6 || fluidId == 7) {
+                        if (debug) {
+                            String fluidType = (fluidId == 6) ? "LAVA" : "WATER";
+                            logger.info("[RTP-SAFETY] " + fluidType + " detected adjacent: FluidId=" + fluidId);
+                        }
+                        return false; // Unsafe - fluid right next to spawn
                     }
-                    return false; // Unsafe - standing on water/lava surface
                 }
             }
             
