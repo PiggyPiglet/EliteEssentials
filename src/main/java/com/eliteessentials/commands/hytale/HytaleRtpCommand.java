@@ -14,7 +14,9 @@ import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.util.MathUtil;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.protocol.BlockMaterial;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
@@ -26,6 +28,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.Random;
 import java.util.concurrent.Executors;
@@ -166,6 +169,9 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         
         if (attempt >= maxAttempts) {
             ctx.sendMessage(Message.raw(configManager.getMessage("rtpFailed", "attempts", String.valueOf(maxAttempts))).color("#FF5555"));
+            if (debug) {
+                logger.info("[RTP] Failed after " + maxAttempts + " attempts - no safe location found");
+            }
             return;
         }
         
@@ -181,9 +187,10 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         double targetZ = centerZ + Math.sin(angle) * distance;
         
         if (debug) {
-            logger.info("[RTP] Attempt " + (attempt + 1) + ": trying " + 
+            logger.info("[RTP] Attempt " + (attempt + 1) + "/" + maxAttempts + ": trying " + 
                        String.format("%.1f, %.1f", targetX, targetZ) + 
-                       " (distance: " + String.format("%.0f", distance) + ")");
+                       " (distance: " + String.format("%.0f", distance) + 
+                       ", angle: " + String.format("%.1f", Math.toDegrees(angle)) + "°)");
         }
         
         long chunkIndex = ChunkUtil.indexChunkFromBlock(targetX, targetZ);
@@ -195,11 +202,18 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         }
         
         if (chunk != null) {
+            if (debug) {
+                logger.info("[RTP] Chunk already loaded, processing immediately");
+            }
             // Already loaded - process immediately
             processChunk(ctx, store, ref, player, world, playerId, centerX, centerZ, 
                         currentLoc, rtpConfig, attempt, targetX, targetZ, chunk);
         } else {
             // Chunk not loaded - load it async and wait for it to be fully ready
+            if (debug) {
+                logger.info("[RTP] Chunk not loaded, loading asynchronously...");
+            }
+            
             final int currentAttempt = attempt;
             final double finalTargetX = targetX;
             final double finalTargetZ = targetZ;
@@ -215,6 +229,9 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
                                        currentLoc, rtpConfig, currentAttempt + 1);
                     });
                 } else {
+                    if (debug) {
+                        logger.info("[RTP] Chunk loaded successfully");
+                    }
                     // Chunk loaded - process on game thread
                     world.execute(() -> {
                         processChunk(ctx, store, ref, player, world, playerId, centerX, centerZ, 
@@ -276,10 +293,296 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         
         if (debug) {
             logger.info("[RTP] Final teleport Y: " + teleportY);
+            
+            // DEBUG: Inspect blocks at and around the teleport location
+            debugBlocksAtLocation(chunk, blockX, (int) teleportY, blockZ);
+        }
+        
+        // SAFETY CHECK: Verify location is safe (no water/lava)
+        if (!isSafeLocation(chunk, blockX, (int) teleportY, blockZ, debug)) {
+            if (debug) {
+                logger.info("[RTP] Location rejected - unsafe (water/lava detected)");
+            }
+            ctx.sendMessage(Message.raw("Searching for safe location...").color("#AAAAAA"));
+            
+            // Try next location
+            tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, 
+                           currentLoc, rtpConfig, attempt + 1);
+            return;
+        }
+        
+        if (debug) {
+            logger.info("[RTP] Location verified as safe");
         }
         
         executeTeleport(ctx, store, ref, world, playerId, currentLoc, rtpConfig, 
                        targetX, teleportY, targetZ);
+    }
+    
+    /**
+     * Check if a location is safe for teleportation (no water/lava).
+     * Uses the chunk's getFluidId method to detect fluids.
+     * 
+     * FluidId 0 = No fluid (safe)
+     * FluidId 6 = Lava (unsafe)
+     * FluidId 7 = Water (unsafe)
+     * 
+     * @return true if safe, false if unsafe (has water/lava)
+     */
+    private boolean isSafeLocation(WorldChunk chunk, int x, int y, int z, boolean debug) {
+        try {
+            // Use reflection to call getFluidId
+            Method getFluidIdMethod = chunk.getClass().getMethod("getFluidId", int.class, int.class, int.class);
+            
+            // Check feet level (y) and head level (y+1)
+            for (int yOffset = 0; yOffset <= 1; yOffset++) {
+                int checkY = y + yOffset;
+                if (checkY < 0 || checkY >= 256) continue;
+                
+                Object fluidIdObj = getFluidIdMethod.invoke(chunk, x, checkY, z);
+                if (fluidIdObj instanceof Integer) {
+                    int fluidId = (Integer) fluidIdObj;
+                    
+                    // FluidId 0 = no fluid (safe)
+                    // FluidId 6 = lava (unsafe)
+                    // FluidId 7 = water (unsafe)
+                    if (fluidId == 6 || fluidId == 7) {
+                        if (debug) {
+                            String fluidType = (fluidId == 6) ? "LAVA" : "WATER";
+                            logger.info("[RTP-SAFETY] " + fluidType + " detected at Y+" + yOffset + " (" + checkY + "): FluidId=" + fluidId);
+                        }
+                        return false; // Unsafe - has lava or water
+                    }
+                }
+            }
+            
+            // Also check the block below (y-1) to ensure we're not standing on water/lava surface
+            Object fluidIdBelow = getFluidIdMethod.invoke(chunk, x, y - 1, z);
+            if (fluidIdBelow instanceof Integer) {
+                int fluidId = (Integer) fluidIdBelow;
+                if (fluidId == 6 || fluidId == 7) {
+                    if (debug) {
+                        String fluidType = (fluidId == 6) ? "LAVA" : "WATER";
+                        logger.info("[RTP-SAFETY] " + fluidType + " detected below at Y-1 (" + (y-1) + "): FluidId=" + fluidId);
+                    }
+                    return false; // Unsafe - standing on water/lava surface
+                }
+            }
+            
+            return true; // Safe - no dangerous fluids detected
+            
+        } catch (Exception e) {
+            if (debug) {
+                logger.warning("[RTP-SAFETY] Could not check fluids (assuming safe): " + e.getMessage());
+            }
+            // If we can't check fluids, assume safe (fallback to old behavior)
+            return true;
+        }
+    }
+    
+    /**
+     * Debug helper to inspect blocks at a location.
+     * This helps us discover BlockMaterial values for water, lava, and other blocks.
+     */
+    private void debugBlocksAtLocation(WorldChunk chunk, int worldX, int worldY, int worldZ) {
+        logger.info("[RTP-DEBUG] ========== Block Analysis at (" + worldX + ", " + worldY + ", " + worldZ + ") ==========");
+        
+        // Get the height map value for comparison
+        int localX = worldX & 15;
+        int localZ = worldZ & 15;
+        try {
+            short heightMapY = chunk.getHeight(localX, localZ);
+            logger.info("[RTP-DEBUG] Height map says surface is at Y=" + heightMapY);
+        } catch (Exception e) {
+            logger.info("[RTP-DEBUG] Could not read height map: " + e.getMessage());
+        }
+        
+        // Check blocks in a vertical column (wider range to catch surface)
+        for (int yOffset = -5; yOffset <= 5; yOffset++) {
+            int checkY = worldY + yOffset;
+            if (checkY < 0 || checkY >= 256) continue;
+            
+            try {
+                BlockType blockType = chunk.getBlockType(worldX, checkY, worldZ);
+                
+                String position = "Y" + (yOffset >= 0 ? "+" : "") + yOffset + " (" + checkY + ")";
+                
+                if (blockType == null) {
+                    logger.info("[RTP-DEBUG] " + position + ": NULL (air or unloaded)");
+                } else {
+                    // Get all available information about the block
+                    String blockInfo = position + ": ";
+                    
+                    // Try to get block ID/name
+                    try {
+                        String id = blockType.getId();
+                        blockInfo += "ID='" + id + "' ";
+                        
+                        // Flag water/lava specifically
+                        if (id.toLowerCase().contains("water")) {
+                            blockInfo += "[WATER!] ";
+                        }
+                        if (id.toLowerCase().contains("lava")) {
+                            blockInfo += "[LAVA!] ";
+                        }
+                    } catch (Exception e) {
+                        blockInfo += "ID=<error> ";
+                    }
+                    
+                    // Get material type
+                    try {
+                        BlockMaterial material = blockType.getMaterial();
+                        blockInfo += "Material=" + material;
+                        
+                        // Check if it's solid (we know this works from /top command)
+                        if (material == BlockMaterial.Solid) {
+                            blockInfo += " [SOLID]";
+                        } else if (material == BlockMaterial.Empty) {
+                            blockInfo += " [EMPTY/AIR]";
+                        } else {
+                            blockInfo += " [" + material.name() + "]";
+                        }
+                    } catch (Exception e) {
+                        blockInfo += "Material=<error>";
+                    }
+                    
+                    // Try to check if it's a fluid using other methods
+                    try {
+                        // Check class name for clues
+                        String className = blockType.getClass().getSimpleName();
+                        if (className.toLowerCase().contains("fluid") || 
+                            className.toLowerCase().contains("water") || 
+                            className.toLowerCase().contains("lava")) {
+                            blockInfo += " Class=" + className + " [FLUID CLASS!]";
+                        }
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                    
+                    logger.info("[RTP-DEBUG] " + blockInfo);
+                }
+            } catch (Exception e) {
+                logger.info("[RTP-DEBUG] Y" + (yOffset >= 0 ? "+" : "") + yOffset + ": ERROR - " + e.getMessage());
+            }
+        }
+        
+        // Check the actual surface level from height map
+        try {
+            short surfaceY = chunk.getHeight(localX, localZ);
+            logger.info("[RTP-DEBUG] --- Checking surface level (Y=" + surfaceY + ") ---");
+            
+            for (int yOffset = -2; yOffset <= 2; yOffset++) {
+                int checkY = surfaceY + yOffset;
+                if (checkY < 0 || checkY >= 256) continue;
+                
+                BlockType blockType = chunk.getBlockType(worldX, checkY, worldZ);
+                if (blockType != null) {
+                    String id = blockType.getId();
+                    String material = blockType.getMaterial().toString();
+                    logger.info("[RTP-DEBUG] Surface" + (yOffset >= 0 ? "+" : "") + yOffset + " (" + checkY + "): ID='" + id + "' Material=" + material);
+                }
+            }
+        } catch (Exception e) {
+            logger.info("[RTP-DEBUG] Could not check surface level: " + e.getMessage());
+        }
+        
+        // Also check horizontally for nearby fluids
+        logger.info("[RTP-DEBUG] --- Checking adjacent blocks (horizontal at Y=" + worldY + ") ---");
+        int[][] offsets = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        String[] directions = {"East", "West", "South", "North"};
+        
+        for (int i = 0; i < offsets.length; i++) {
+            int checkX = worldX + offsets[i][0];
+            int checkZ = worldZ + offsets[i][1];
+            
+            try {
+                BlockType blockType = chunk.getBlockType(checkX, worldY, checkZ);
+                if (blockType != null) {
+                    String id = "unknown";
+                    String material = "unknown";
+                    
+                    try {
+                        id = blockType.getId();
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                    
+                    try {
+                        material = blockType.getMaterial().toString();
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                    
+                    String flag = "";
+                    if (id.toLowerCase().contains("water")) flag = " [WATER!]";
+                    if (id.toLowerCase().contains("lava")) flag = " [LAVA!]";
+                    
+                    logger.info("[RTP-DEBUG] " + directions[i] + ": ID='" + id + "' Material=" + material + flag);
+                }
+            } catch (Exception e) {
+                // Ignore - might be outside chunk bounds
+            }
+        }
+        
+        // Try to check fluid section if it exists
+        logger.info("[RTP-DEBUG] --- Attempting to check fluid data ---");
+        try {
+            // This is exploratory - we don't know if these methods exist
+            logger.info("[RTP-DEBUG] Chunk class: " + chunk.getClass().getName());
+            
+            // Look for fluid-related methods
+            Method[] methods = chunk.getClass().getMethods();
+            logger.info("[RTP-DEBUG] Looking for fluid-related methods...");
+            for (Method method : methods) {
+                String methodName = method.getName().toLowerCase();
+                if (methodName.contains("fluid") || methodName.contains("water") || methodName.contains("lava")) {
+                    logger.info("[RTP-DEBUG] Found method: " + method.getName() + " returns " + method.getReturnType().getSimpleName());
+                }
+            }
+            
+            // Try to call getFluidId - this is the key method!
+            try {
+                Method getFluidIdMethod = chunk.getClass().getMethod("getFluidId", int.class, int.class, int.class);
+                Object fluidIdResult = getFluidIdMethod.invoke(chunk, worldX, worldY, worldZ);
+                logger.info("[RTP-DEBUG] getFluidId(" + worldX + ", " + worldY + ", " + worldZ + ") = " + fluidIdResult);
+                
+                // Also check the surface level
+                short surfaceY = chunk.getHeight(localX, localZ);
+                Object surfaceFluidId = getFluidIdMethod.invoke(chunk, worldX, (int)surfaceY, worldZ);
+                logger.info("[RTP-DEBUG] getFluidId at surface (Y=" + surfaceY + ") = " + surfaceFluidId);
+                
+                // Check a few blocks around the teleport Y
+                for (int yOffset = -2; yOffset <= 2; yOffset++) {
+                    int checkY = worldY + yOffset;
+                    if (checkY >= 0 && checkY < 256) {
+                        Object fluidId = getFluidIdMethod.invoke(chunk, worldX, checkY, worldZ);
+                        if (fluidId != null && !fluidId.equals(0)) {
+                            logger.info("[RTP-DEBUG] FLUID DETECTED at Y" + (yOffset >= 0 ? "+" : "") + yOffset + " (" + checkY + "): FluidId=" + fluidId);
+                        }
+                    }
+                }
+            } catch (NoSuchMethodException e) {
+                logger.info("[RTP-DEBUG] No getFluidId(x,y,z) method found");
+            } catch (Exception e) {
+                logger.info("[RTP-DEBUG] Error calling getFluidId: " + e.getMessage());
+            }
+            
+            // Try to call getFluidLevel
+            try {
+                Method getFluidLevelMethod = chunk.getClass().getMethod("getFluidLevel", int.class, int.class, int.class);
+                Object fluidLevelResult = getFluidLevelMethod.invoke(chunk, worldX, worldY, worldZ);
+                logger.info("[RTP-DEBUG] getFluidLevel(" + worldX + ", " + worldY + ", " + worldZ + ") = " + fluidLevelResult);
+            } catch (NoSuchMethodException e) {
+                logger.info("[RTP-DEBUG] No getFluidLevel(x,y,z) method found");
+            } catch (Exception e) {
+                logger.info("[RTP-DEBUG] Error calling getFluidLevel: " + e.getMessage());
+            }
+            
+        } catch (Exception e) {
+            logger.info("[RTP-DEBUG] Could not inspect chunk class: " + e.getMessage());
+        }
+        
+        logger.info("[RTP-DEBUG] ========================================");
     }
     
     private void executeTeleport(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
@@ -289,7 +592,14 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         boolean debug = configManager.isDebugEnabled();
         
         if (debug) {
+            logger.info("[RTP] ========== EXECUTING TELEPORT ==========");
             logger.info("[RTP] Teleporting to: " + String.format("%.1f, %.1f, %.1f", teleportX, teleportY, teleportZ));
+            logger.info("[RTP] From: " + String.format("%.1f, %.1f, %.1f", currentLoc.getX(), currentLoc.getY(), currentLoc.getZ()));
+            double distance = Math.sqrt(
+                Math.pow(teleportX - currentLoc.getX(), 2) + 
+                Math.pow(teleportZ - currentLoc.getZ(), 2)
+            );
+            logger.info("[RTP] Distance traveled: " + String.format("%.1f", distance) + " blocks");
         }
         
         // Save location for /back
@@ -306,10 +616,17 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             // Use putComponent instead of addComponent to handle case where component already exists
             store.putComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE);
             
+            if (debug) {
+                logger.info("[RTP] Applied " + invulnerabilitySeconds + "s invulnerability");
+            }
+            
             scheduler.schedule(() -> {
                 world.execute(() -> {
                     try {
                         store.removeComponent(ref, Invulnerable.getComponentType());
+                        if (debug) {
+                            logger.info("[RTP] Removed invulnerability");
+                        }
                     } catch (Exception e) {
                         // Ignore - component might already be removed or player disconnected
                     }
@@ -321,5 +638,10 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         ctx.sendMessage(Message.raw(configManager.getMessage("rtpTeleported", "location", location)).color("#55FF55"));
         
         rtpService.setCooldown(playerId);
+        
+        if (debug) {
+            logger.info("[RTP] Teleport complete, cooldown set");
+            logger.info("[RTP] ========================================");
+        }
     }
 }

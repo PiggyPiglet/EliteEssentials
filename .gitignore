@@ -40,6 +40,9 @@ jar_contents.txt
 *.swp
 *~
 
+# Development notes and research (not for distribution)
+dev-notes/
+
 # Package files (build outputs should be in releases, not repo)
 *.jar
 !gradle/wrapper/gradle-wrapper.jar

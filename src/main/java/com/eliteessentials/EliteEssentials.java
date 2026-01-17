@@ -257,6 +257,9 @@ public class EliteEssentials extends JavaPlugin {
         // RTP command
         getCommandRegistry().registerCommand(new HytaleRtpCommand(rtpService, backService, configManager, warmupService));
         
+        // TEMPORARY: Debug command to check fluid IDs
+        getCommandRegistry().registerCommand(new HytaleCheckFluidCommand());
+        
         // TPA commands
         getCommandRegistry().registerCommand(new HytaleTpaCommand(tpaService));
         getCommandRegistry().registerCommand(new HytaleTpAcceptCommand(tpaService, backService));
