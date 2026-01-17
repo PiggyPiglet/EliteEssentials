@@ -259,6 +259,7 @@ public class EliteEssentials extends JavaPlugin {
         
         // TPA commands
         getCommandRegistry().registerCommand(new HytaleTpaCommand(tpaService));
+        getCommandRegistry().registerCommand(new HytaleTpahereCommand(tpaService));
         getCommandRegistry().registerCommand(new HytaleTpAcceptCommand(tpaService, backService));
         getCommandRegistry().registerCommand(new HytaleTpDenyCommand(tpaService));
         

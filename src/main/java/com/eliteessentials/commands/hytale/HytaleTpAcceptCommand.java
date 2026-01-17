@@ -150,16 +150,36 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
             reqRot.x, reqRot.y
         );
 
-        // Define the teleport action
+        // Define the teleport action based on request type
         Runnable doTeleport = () -> {
-            backService.pushLocation(request.getRequesterId(), requesterLoc);
-            
-            // Teleport using putComponent like Essentials does
-            Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, 0, 0));
-            requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
-            logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
-            
-            requester.sendMessage(Message.raw(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername())).color("#55FF55"));
+            if (request.getType() == TpaRequest.Type.TPA) {
+                // Regular TPA: Requester teleports to target (acceptor)
+                backService.pushLocation(request.getRequesterId(), requesterLoc);
+                
+                Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, 0, 0));
+                requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
+                logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
+                
+                requester.sendMessage(Message.raw(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername())).color("#55FF55"));
+            } else {
+                // TPAHERE: Target (acceptor) teleports to requester
+                HeadRotation targetHeadRot = (HeadRotation) store.getComponent(ref, HeadRotation.getComponentType());
+                Vector3f targetRot = targetHeadRot != null ? targetHeadRot.getRotation() : new Vector3f(0, 0, 0);
+                Location targetLoc = new Location(
+                    world.getName(),
+                    targetPos.getX(), targetPos.getY(), targetPos.getZ(),
+                    targetRot.x, targetRot.y
+                );
+                
+                backService.pushLocation(playerId, targetLoc);
+                
+                Teleport teleport = new Teleport(finalRequesterWorld, requesterPos, new Vector3f(0, 0, 0));
+                store.putComponent(ref, Teleport.getComponentType(), teleport);
+                logger.fine("[TPAHERE] Teleport component added for " + player.getUsername());
+                
+                ctx.sendMessage(Message.raw(configManager.getMessage("tpahereAcceptedTarget", "player", request.getRequesterName())).color("#55FF55"));
+                requester.sendMessage(Message.raw(configManager.getMessage("tpahereAcceptedRequester", "player", player.getUsername())).color("#55FF55"));
+            }
         };
 
         // Get effective warmup (check bypass permission for requester)

@@ -56,9 +56,10 @@ public class TpaService {
      * @param requesterName Name of the requester
      * @param targetId UUID of the target player
      * @param targetName Name of the target
+     * @param type Type of request (TPA or TPAHERE)
      * @return Result of the operation
      */
-    public Result createRequest(UUID requesterId, String requesterName, UUID targetId, String targetName) {
+    public Result createRequest(UUID requesterId, String requesterName, UUID targetId, String targetName, TpaRequest.Type type) {
         if (requesterId.equals(targetId)) {
             return Result.SELF_REQUEST;
         }
@@ -78,13 +79,21 @@ public class TpaService {
                 requesterName,
                 targetId,
                 targetName,
+                type,
                 configManager.getTpaTimeout()
         );
         
         targetRequests.add(request);
-        logger.info("TPA request created: " + requesterName + " -> " + targetName);
+        logger.info("TPA request created: " + requesterName + " -> " + targetName + " (type: " + type + ")");
         
         return Result.REQUEST_SENT;
+    }
+
+    /**
+     * Create a new teleport request (defaults to TPA type).
+     */
+    public Result createRequest(UUID requesterId, String requesterName, UUID targetId, String targetName) {
+        return createRequest(requesterId, requesterName, targetId, targetName, TpaRequest.Type.TPA);
     }
 
     /**

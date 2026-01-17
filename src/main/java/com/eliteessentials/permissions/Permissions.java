@@ -45,6 +45,7 @@ public final class Permissions {
     
     // Commands
     public static final String TPA = TP_CATEGORY + ".tpa";
+    public static final String TPAHERE = TP_CATEGORY + ".tpahere";
     public static final String TPACCEPT = TP_CATEGORY + ".tpaccept";
     public static final String TPDENY = TP_CATEGORY + ".tpdeny";
     public static final String RTP = TP_CATEGORY + ".rtp";
