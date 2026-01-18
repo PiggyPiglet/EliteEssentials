@@ -140,7 +140,8 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
             
             world.execute(() -> {
                 Vector3d targetPos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
-                Vector3f targetRot = new Vector3f(loc.getPitch(), loc.getYaw(), 0);  // x=pitch, y=yaw, z=roll
+                // Always use pitch=0 to keep player upright, preserve yaw for direction
+                Vector3f targetRot = new Vector3f(0, loc.getYaw(), 0);
                 
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);

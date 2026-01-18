@@ -56,6 +56,7 @@ All 60+ player-facing messages are configurable in `config.json`. Translate the 
 ### Teleport Requests
 
 *   **`/tpa <player>`** - Request to teleport to another player
+*   **`/tpahere <player>`** - Request a player to teleport to you
 *   **`/tpaccept`** - Accept a teleport request
 *   **`/tpdeny`** - Deny a teleport request
 *   30-second timeout (configurable)
@@ -82,6 +83,7 @@ All 60+ player-facing messages are configurable in `config.json`. Translate the 
 *   **`/god`** - Toggle invincibility (Admin)
 *   **`/heal`** - Fully restore health (Admin)
 *   **`/fly`** - Toggle creative flight mode (Admin)
+*   **`/flyspeed <speed>`** - Set fly speed multiplier 0-10 (Admin)
 *   **`/top`** - Teleport to highest block at your position
 
 ### Sleep Percentage (Admin)
@@ -119,6 +121,7 @@ Config file is automatically created on first server start with sensible default
 | <code>/setspawn</code>       |Set server spawn location   |Admin      |
 | <code>/rtp</code>            |Random teleport             |Everyone   |
 | <code>/tpa &lt;player&gt;</code> |Request teleport            |Everyone   |
+| <code>/tpahere &lt;player&gt;</code> |Request player to you       |Everyone   |
 | <code>/tpaccept</code>       |Accept teleport request     |Everyone   |
 | <code>/tpdeny</code>         |Deny teleport request       |Everyone   |
 | <code>/warp [name]</code>    |Teleport to warp            |Everyone   |
@@ -133,6 +136,7 @@ Config file is automatically created on first server start with sensible default
 | <code>/god</code>            |Toggle invincibility        |Admin      |
 | <code>/heal</code>           |Restore full health         |Admin      |
 | <code>/fly</code>            |Toggle flight mode          |Admin      |
+| <code>/flyspeed &lt;speed&gt;</code> |Set fly speed (1-100 or reset) |Admin      |
 | <code>/sleeppercent [%]</code> |Set sleep percentage        |Admin      |
 | <code>/eliteessentials reload</code> |Reload configuration        |Admin      |
 
@@ -154,10 +158,11 @@ Full granular permissions following `eliteessentials.command.<category>.<action>
 | Category |Example Permissions                                           |
 | -------- |------------------------------------------------------------- |
 | Home     |<code>command.home.home</code>, <code>command.home.sethome</code>, <code>command.home.limit.5</code> |
-| Teleport |<code>command.tp.tpa</code>, <code>command.tp.back</code>, <code>command.tp.back.ondeath</code> |
+| Teleport |<code>command.tp.tpa</code>, <code>command.tp.tpahere</code>, <code>command.tp.back</code>, <code>command.tp.back.ondeath</code> |
 | Warp     |<code>command.warp.use</code>, <code>command.warp.&lt;warpname&gt;</code> |
 | Spawn    |<code>command.spawn.use</code>, <code>command.spawn.set</code>, <code>command.spawn.protection.bypass</code> |
 | Kit      |<code>command.kit.use</code>, <code>command.kit.&lt;kitname&gt;</code>, <code>command.kit.bypass.cooldown</code> |
+| Misc     |<code>command.misc.fly</code>, <code>command.misc.flyspeed</code>, <code>command.misc.god</code>, <code>command.misc.heal</code> |
 | Bypass   |<code>command.home.bypass.cooldown</code>, <code>command.tp.bypass.warmup</code> |
 
 Enable advanced mode by setting `"advancedPermissions": true` in config.json.

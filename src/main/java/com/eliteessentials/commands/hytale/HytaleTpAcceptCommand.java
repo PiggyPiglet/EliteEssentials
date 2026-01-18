@@ -156,7 +156,12 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
                 // Regular TPA: Requester teleports to target (acceptor)
                 backService.pushLocation(request.getRequesterId(), requesterLoc);
                 
-                Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, 0, 0));
+                // Get target's yaw to face the same direction
+                HeadRotation targetHeadRot = (HeadRotation) store.getComponent(ref, HeadRotation.getComponentType());
+                float targetYaw = targetHeadRot != null ? targetHeadRot.getRotation().y : 0;
+                
+                // Always use pitch=0 to keep player upright
+                Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, targetYaw, 0));
                 requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
                 logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
                 
@@ -173,7 +178,11 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
                 
                 backService.pushLocation(playerId, targetLoc);
                 
-                Teleport teleport = new Teleport(finalRequesterWorld, requesterPos, new Vector3f(0, 0, 0));
+                // Get requester's yaw to face the same direction
+                float requesterYaw = reqRot.y;
+                
+                // Always use pitch=0 to keep player upright
+                Teleport teleport = new Teleport(finalRequesterWorld, requesterPos, new Vector3f(0, requesterYaw, 0));
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 logger.fine("[TPAHERE] Teleport component added for " + player.getUsername());
                 

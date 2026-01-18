@@ -99,10 +99,9 @@ public class StarterKitEvent {
                 logger.info("Applying starter kit '" + kit.getDisplayName() + "' to " + username);
                 applyKit(kit, inventory);
                 
-                // Mark as claimed if onetime
-                if (kit.isOnetime()) {
-                    kitService.setOnetimeClaimed(uuid, kit.getId());
-                }
+                // Always mark starter kits as claimed to prevent re-claiming via /kit
+                // This applies regardless of whether the kit is onetime or has a cooldown
+                kitService.setOnetimeClaimed(uuid, kit.getId());
                 
                 logger.info("Applied starter kit '" + kit.getDisplayName() + "' to new player " + username);
             }

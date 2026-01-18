@@ -107,8 +107,10 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         );
         
         // Spawn position and rotation
+        // Vector3f structure: x = pitch, y = yaw, z = roll
+        // Always use pitch=0 to keep player upright, preserve yaw for direction
         Vector3d spawnPos = new Vector3d(spawn.x, spawn.y, spawn.z);
-        Vector3f spawnRot = new Vector3f(spawn.pitch, spawn.yaw, 0);
+        Vector3f spawnRot = new Vector3f(0, spawn.yaw, 0);
         
         // Define the actual teleport action
         Runnable doTeleport = () -> {

@@ -33,6 +33,10 @@ public class SimpleStringArg extends SingleArgumentType<String> {
     // ===== ADMIN =====
     // Action arg (for reload, etc.)
     public static final SimpleStringArg ACTION = new SimpleStringArg("Action", "Command action", new String[]{"reload"});
+    
+    // ===== FLY SPEED =====
+    // Fly speed multiplier
+    public static final SimpleStringArg FLY_SPEED = new SimpleStringArg("1-100", "Fly speed (1-100 or 'reset')", new String[]{"reset", "10", "50", "100"});
 
     private final String[] examples;
 

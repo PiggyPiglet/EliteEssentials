@@ -10,18 +10,25 @@ All notable changes to EliteEssentials will be documented in this file.
   - New request type system distinguishes between TPA (you go to them) and TPAHERE (they come to you)
   - Uses same permission structure as TPA
   - Permission: `eliteessentials.command.tp.tpahere` in advanced mode
-  - Config messages: `tpahereRequestSent`, `tpahereRequestReceived`, `tpahereAcceptedTarget`, `tpahereAcceptedRequester`
+  - Config messages: `tpahereRequestSent`, `tpahereRequestReceived`
   - Both players' `/back` locations are saved
   - Warmup applies to the person being teleported
-- **Fly Speed Command**: `/flyspeed <speed>` sets fly speed multiplier (0-10, where 0 = default)
-  - Validates input range (0-10)
+- **Fly Speed Command**: `/flyspeed <speed>` or `/flyspeed reset` sets fly speed multiplier (1-100, default is 15)
+  - Range: 1 = very slow, 15 = default, 100 = maximum speed
+  - `/flyspeed reset` restores default speed (15)
   - Admin-only command in simple mode
   - Permission: `eliteessentials.command.misc.flyspeed` in advanced mode
   - Config messages: `flySpeedSet`, `flySpeedReset`, `flySpeedInvalid`, `flySpeedOutOfRange`
+  - **WARNING**: Setting speed to 0 will crash the server - validation prevents this
 
 ### Fixed
 
-- **RTP ground detection**: Fixed players spawning in the sky
+- **Teleport rotation bug**: Fixed character tilting/leaning after using ANY teleport command
+  - Issue: Players would land at an angle instead of standing upright
+  - Solution: All teleports now use pitch=0 (upright) while preserving yaw (horizontal direction)
+  - Affects: `/spawn`, `/home`, `/warp`, `/back`, `/tpa`, `/tpahere`, `/rtp`, `/top`
+  - Players now always land standing straight, facing the correct direction
+- **RTP ground detection**: Fixed players spawning in the sky or underground
   - Now scans from top to bottom for solid blocks (like `/top` command)
   - No longer uses unreliable height map
   - Respects `minSurfaceY` config setting
@@ -35,19 +42,17 @@ All notable changes to EliteEssentials will be documented in this file.
   - Better distribution of random locations
 - **`/setspawn` permission check**: Command was using wrong permission method, allowing any player to use it
   - Now properly requires admin permission (simple mode) or `eliteessentials.command.spawn.set` (advanced mode)
-- **Teleport rotation bug**: Fixed character tilting/leaning forward after using `/home`, `/warp`, `/back` commands
-  - Issue was caused by incorrect rotation vector construction
-  - Changed from using `rotation.getYaw()`/`rotation.getPitch()` methods to direct field access (`rotation.y`/`rotation.x`)
-  - Vector3f structure: x=pitch, y=yaw, z=roll
-  - Affects: `/home`, `/sethome`, `/warp`, `/setwarp`, `/back` commands
-  - Players now teleport with correct orientation matching how they were facing when the location was saved
+- **Starter kit double-claim bug**: Players who received a starter kit on join could claim it again via `/kit`
+  - Starter kits are now always marked as claimed when given on join
+  - Prevents duplicate claiming through the kit GUI
 
 ### Changed
 
 - **TpaRequest model**: Added `Type` enum to distinguish between TPA and TPAHERE requests
 - **TpaService**: Added overloaded `createRequest()` method accepting request type parameter
 - **`/tpaccept` command**: Now handles both TPA and TPAHERE request types with correct teleport direction
-- Updated documentation (README.md, PERMISSIONS.md) to include `/flyspeed` and `/tpahere` commands
+- **All teleport commands**: Now use pitch=0 for upright landing instead of preserving pitch angle
+- Updated documentation (README.md, PERMISSIONS.md, CURSEFORGE.MD) to include `/flyspeed` and `/tpahere` commands
 - Command registration log now includes `/flyspeed` and `/tpahere`
 
 ### Technical Improvements
@@ -56,6 +61,8 @@ All notable changes to EliteEssentials will be documented in this file.
 - Enhanced RTP debug logging for troubleshooting purposes
 - Improved fluid detection system for safer teleportation
 - Better error handling for chunk loading failures in RTP
+- Rotation handling now uses direct field access (`rotation.y` for yaw, `rotation.x` for pitch) instead of getter methods
+- All Teleport components use `putComponent()` instead of `addComponent()` for creative mode compatibility
 
 ## [1.0.4] - 2026-01-16
 

@@ -20,11 +20,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  * Sets the player's fly speed multiplier.
  * 
  * Usage:
- * - /flyspeed 0 - Reset to default fly speed
- * - /flyspeed 2 - Set fly speed to 2x
- * - /flyspeed 5 - Set fly speed to 5x (fast!)
+ * - /flyspeed reset - Reset to default fly speed (15)
+ * - /flyspeed 10 - Set fly speed to 10x
+ * - /flyspeed 50 - Set fly speed to 50x (very fast!)
+ * - /flyspeed 100 - Set fly speed to 100x (insane!)
  * 
- * Speed Range: 0 (default) to 10 (maximum)
+ * Speed Range: 1 to 100, or "reset" to restore default (15)
  * 
  * Permissions:
  * - Simple Mode: Admin only
@@ -36,9 +37,9 @@ public class HytaleFlySpeedCommand extends AbstractPlayerCommand {
     private final RequiredArg<String> speedArg;
 
     public HytaleFlySpeedCommand(ConfigManager configManager) {
-        super("flyspeed", "Set your fly speed (0-10, 0 = default)");
+        super("flyspeed", "Set your fly speed (1-100 or 'reset')");
         this.configManager = configManager;
-        this.speedArg = withRequiredArg("speed", "Fly speed multiplier (0 = default)", SimpleStringArg.SIMPLE_STRING);
+        this.speedArg = withRequiredArg("speed", "Fly speed (1-100 or 'reset')", SimpleStringArg.FLY_SPEED);
     }
 
     @Override
@@ -57,18 +58,24 @@ public class HytaleFlySpeedCommand extends AbstractPlayerCommand {
 
         // Parse speed argument
         String speedStr = ctx.get(speedArg);
-        float speed;
-        try {
-            speed = Float.parseFloat(speedStr);
-        } catch (NumberFormatException e) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedInvalid")).color("#FF5555"));
-            return;
-        }
+        
+        // Check for reset command
+        boolean isReset = speedStr.equalsIgnoreCase("reset") || speedStr.equalsIgnoreCase("default");
+        float speed = 0;
+        
+        if (!isReset) {
+            try {
+                speed = Float.parseFloat(speedStr);
+            } catch (NumberFormatException e) {
+                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedInvalid")).color("#FF5555"));
+                return;
+            }
 
-        // Validate speed range (0 to 10)
-        if (speed < 0 || speed > 10) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedOutOfRange")).color("#FF5555"));
-            return;
+            // Validate speed range (1 to 100)
+            if (speed < 1.0f || speed > 100.0f) {
+                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedOutOfRange")).color("#FF5555"));
+                return;
+            }
         }
 
         // Get movement manager
@@ -80,16 +87,40 @@ public class HytaleFlySpeedCommand extends AbstractPlayerCommand {
 
         // Set fly speed in movement settings
         var settings = movementManager.getSettings();
-        settings.flySpeed = speed;
-
-        // Update the client
-        movementManager.update(player.getPacketHandler());
-
-        // Send message
-        if (speed == 0) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedReset")).color("#55FF55"));
-        } else {
-            ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedSet", "speed", String.format("%.1f", speed))).color("#55FF55"));
+        
+        try {
+            // Set both horizontal and vertical fly speed
+            // These are the actual fields used by the Hytale API
+            java.lang.reflect.Field horizontalField = settings.getClass().getField("horizontalFlySpeed");
+            java.lang.reflect.Field verticalField = settings.getClass().getField("verticalFlySpeed");
+            
+            if (isReset) {
+                // Reset to default speed of 15
+                horizontalField.setFloat(settings, 15.0f);
+                verticalField.setFloat(settings, 15.0f);
+                movementManager.update(player.getPacketHandler());
+                
+                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedReset")).color("#55FF55"));
+                if (configManager.isDebugEnabled()) {
+                    ctx.sendMessage(Message.raw("Speed reset to default: 15.0").color("#AAAAAA"));
+                }
+            } else {
+                horizontalField.setFloat(settings, speed);
+                verticalField.setFloat(settings, speed);
+                movementManager.update(player.getPacketHandler());
+                
+                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedSet", "speed", String.format("%.1f", speed))).color("#55FF55"));
+            }
+        } catch (NoSuchFieldException e) {
+            ctx.sendMessage(Message.raw("Fly speed control is not available in the current Hytale API.").color("#FFAA00"));
+            if (configManager.isDebugEnabled()) {
+                ctx.sendMessage(Message.raw("Error: " + e.getMessage()).color("#AAAAAA"));
+            }
+        } catch (Exception e) {
+            ctx.sendMessage(Message.raw("Error setting fly speed: " + e.getMessage()).color("#FF5555"));
+            if (configManager.isDebugEnabled()) {
+                e.printStackTrace();
+            }
         }
     }
 }

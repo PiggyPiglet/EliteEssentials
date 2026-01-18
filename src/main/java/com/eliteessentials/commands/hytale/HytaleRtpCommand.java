@@ -619,8 +619,13 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         int invulnerabilitySeconds = rtpConfig.invulnerabilitySeconds;
         
         // Create teleport - use putComponent to avoid "already exists" error
+        // Get current yaw to preserve horizontal facing direction
+        HeadRotation headRotation = (HeadRotation) store.getComponent(ref, HeadRotation.getComponentType());
+        float currentYaw = headRotation != null ? headRotation.getRotation().y : 0;
+        
         Vector3d targetPos = new Vector3d(teleportX, teleportY, teleportZ);
-        Teleport teleport = new Teleport(targetPos, Vector3f.NaN);
+        // Always use pitch=0 to keep player upright
+        Teleport teleport = new Teleport(targetPos, new Vector3f(0, currentYaw, 0));
         store.putComponent(ref, Teleport.getComponentType(), teleport);
         
         if (invulnerabilitySeconds > 0) {

@@ -82,6 +82,10 @@ public class PluginConfig {
         messages.put("tpaCouldNotFindRequester", "Could not find requester.");
         messages.put("tpaCouldNotGetRequesterPosition", "Could not get requester's position.");
         
+        // ==================== TPAHERE ====================
+        messages.put("tpahereRequestSent", "Teleport request sent to {player}. They will teleport to you if they accept.");
+        messages.put("tpahereRequestReceived", "{player} wants you to teleport to them.");
+        
         // ==================== HOMES ====================
         messages.put("homeNoHomes", "You have no homes set. Use /sethome to create one.");
         messages.put("homeListHeader", "Your homes ({count}/{max}):");
@@ -164,10 +168,10 @@ public class PluginConfig {
         messages.put("flyEnabled", "Flight mode enabled! Double-tap jump to fly.");
         messages.put("flyDisabled", "Flight mode disabled.");
         messages.put("flyFailed", "Could not access movement settings.");
-        messages.put("flySpeedSet", "Fly speed set to {speed}.");
+        messages.put("flySpeedSet", "Fly speed set to {speed}x.");
         messages.put("flySpeedReset", "Fly speed reset to default.");
-        messages.put("flySpeedInvalid", "Invalid speed value. Please enter a number.");
-        messages.put("flySpeedOutOfRange", "Speed must be between 0 and 10.");
+        messages.put("flySpeedInvalid", "Invalid speed value. Use a number (1-100) or 'reset'.");
+        messages.put("flySpeedOutOfRange", "Speed must be between 1 and 100, or use 'reset'.");
         
         // ==================== TOP ====================
         messages.put("topTeleported", "Teleported to the top!");

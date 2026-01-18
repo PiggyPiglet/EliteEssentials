@@ -38,6 +38,7 @@ All 60+ player-facing messages are configurable in `config.json`. Translate your
 
 ### Teleport Requests
 - **`/tpa <player>`** - Request to teleport to another player
+- **`/tpahere <player>`** - Request a player to teleport to you
 - **`/tpaccept`** - Accept a teleport request
 - **`/tpdeny`** - Deny a teleport request
 - 30-second timeout (configurable)
@@ -93,6 +94,7 @@ Config file is automatically created on first server start with sensible default
 | `/spawn` | Teleport to spawn | Everyone |
 | `/rtp` | Random teleport | Everyone |
 | `/tpa <player>` | Request teleport | Everyone |
+| `/tpahere <player>` | Request player to you | Everyone |
 | `/tpaccept` | Accept teleport request | Everyone |
 | `/tpdeny` | Deny teleport request | Everyone |
 | `/warp [name]` | Teleport to warp | Everyone |

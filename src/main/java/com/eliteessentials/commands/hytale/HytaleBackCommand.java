@@ -104,7 +104,8 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
             
             world.execute(() -> {
                 Vector3d targetPos = new Vector3d(destination.getX(), destination.getY(), destination.getZ());
-                Vector3f targetRot = new Vector3f(destination.getPitch(), destination.getYaw(), 0);
+                // Always use pitch=0 to keep player upright, preserve yaw for direction
+                Vector3f targetRot = new Vector3f(0, destination.getYaw(), 0);
                 
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
