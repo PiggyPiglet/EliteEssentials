@@ -10,6 +10,8 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.io.File;
 import java.io.FileReader;
@@ -75,6 +77,7 @@ public class JoinQuitListener {
     
     /**
      * Handle player join event.
+     * Uses world.execute() to ensure thread safety when accessing store components.
      */
     private void onPlayerJoin(PlayerReadyEvent event) {
         var ref = event.getPlayerRef();
@@ -83,47 +86,66 @@ public class JoinQuitListener {
         }
         
         var store = ref.getStore();
-        PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
-        if (playerRef == null) {
+        
+        // Get world for thread-safe execution
+        EntityStore entityStore = store.getExternalData();
+        if (entityStore == null) {
             return;
         }
         
-        UUID playerId = playerRef.getUuid();
-        String playerName = playerRef.getUsername();
-        PluginConfig config = configManager.getConfig();
+        World world = entityStore.getWorld();
+        if (world == null) {
+            return;
+        }
         
-        // Check if first join
-        boolean isFirstJoin = !firstJoinPlayers.contains(playerId);
-        
-        if (isFirstJoin) {
-            // Add to first join set
-            firstJoinPlayers.add(playerId);
-            save();
+        // Execute on world thread to ensure thread safety
+        world.execute(() -> {
+            if (!ref.isValid()) {
+                return;
+            }
             
-            // Broadcast first join message
-            if (config.joinMsg.firstJoinEnabled) {
-                String message = configManager.getMessage("firstJoinMessage", "player", playerName);
-                broadcastMessage(message, "#FFFF55");
+            PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
+            if (playerRef == null) {
+                return;
             }
-        } else {
-            // Regular join message
-            if (config.joinMsg.joinEnabled) {
-                String message = configManager.getMessage("joinMessage", "player", playerName);
-                broadcastMessage(message, "#55FF55");
-            }
-        }
-        
-        // Show MOTD
-        if (config.motd.enabled && config.motd.showOnJoin) {
-            int delay = config.motd.delaySeconds;
-            if (delay > 0) {
-                // Schedule MOTD display after delay
-                scheduleMotd(playerRef, delay);
+            
+            UUID playerId = playerRef.getUuid();
+            String playerName = playerRef.getUsername();
+            PluginConfig config = configManager.getConfig();
+            
+            // Check if first join
+            boolean isFirstJoin = !firstJoinPlayers.contains(playerId);
+            
+            if (isFirstJoin) {
+                // Add to first join set
+                firstJoinPlayers.add(playerId);
+                save();
+                
+                // Broadcast first join message
+                if (config.joinMsg.firstJoinEnabled) {
+                    String message = configManager.getMessage("firstJoinMessage", "player", playerName);
+                    broadcastMessage(message, "#FFFF55");
+                }
             } else {
-                // Show immediately
-                showMotd(playerRef);
+                // Regular join message
+                if (config.joinMsg.joinEnabled) {
+                    String message = configManager.getMessage("joinMessage", "player", playerName);
+                    broadcastMessage(message, "#55FF55");
+                }
             }
-        }
+            
+            // Show MOTD
+            if (config.motd.enabled && config.motd.showOnJoin) {
+                int delay = config.motd.delaySeconds;
+                if (delay > 0) {
+                    // Schedule MOTD display after delay
+                    scheduleMotd(playerRef, delay);
+                } else {
+                    // Show immediately
+                    showMotd(playerRef);
+                }
+            }
+        });
     }
     
     /**

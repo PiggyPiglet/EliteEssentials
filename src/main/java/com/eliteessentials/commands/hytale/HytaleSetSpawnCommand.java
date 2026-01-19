@@ -67,15 +67,12 @@ public class HytaleSetSpawnCommand extends AbstractPlayerCommand {
         // Update spawn protection service
         EliteEssentials.getInstance().getSpawnProtectionService().setSpawnLocation(pos.getX(), pos.getY(), pos.getZ());
 
-        // CRITICAL: Update the world's spawn provider so players respawn here after death
-        // Must create new Vector3d/Vector3f instances - Transform stores references, not copies!
-        Vector3d spawnPosition = new Vector3d(pos.getX(), pos.getY(), pos.getZ());
-        Vector3f spawnRotation = new Vector3f(rot.x, rot.y, 0); // pitch, yaw, roll
-        Transform spawnTransform = new Transform(spawnPosition, spawnRotation);
-        world.getWorldConfig().setSpawnProvider(new GlobalSpawnProvider(spawnTransform));
+        // NOTE: Respawn behavior is handled by RespawnListener system:
+        // - Players with bed spawns will respawn at their bed (vanilla behavior)
+        // - Players without bed spawns will respawn at this /setspawn location
 
         ctx.sendMessage(MessageFormatter.formatWithFallback("Spawn set at " + 
             String.format("%.1f, %.1f, %.1f", pos.getX(), pos.getY(), pos.getZ()) + 
-            " (Players will now respawn here after death)", "#55FF55"));
+            " (Players without beds will respawn here)", "#55FF55"));
     }
 }

@@ -59,176 +59,173 @@ public class PluginConfig {
     
     private void initDefaultMessages() {
         // ==================== GENERAL ====================
-        messages.put("prefix", "[EliteEssentials] ");
-        messages.put("noPermission", "You don't have permission to use this command.");
-        messages.put("playerNotFound", "Player not found.");
-        messages.put("commandDisabled", "This command is disabled.");
-        messages.put("onCooldown", "You must wait {seconds} seconds before using this command again.");
-        messages.put("warmupStarted", "Teleporting in {seconds} seconds. Don't move!");
-        messages.put("warmupCancelled", "Teleport cancelled - you moved!");
-        messages.put("warmupCountdown", "Teleporting in {seconds}...");
-        messages.put("teleportInProgress", "You already have a teleport in progress!");
-        messages.put("couldNotGetPosition", "Could not get your position.");
+        messages.put("prefix", "&7[&bEliteEssentials&7]&r ");
+        messages.put("noPermission", "&cYou don't have permission to use this command.");
+        messages.put("playerNotFound", "&cPlayer '&e{player}&c' is not online.");
+        messages.put("commandDisabled", "&cThis command is disabled.");
+        messages.put("onCooldown", "&eYou must wait &c{seconds} &eseconds before using this command again.");
+        messages.put("warmupStarted", "&eTeleporting in &a{seconds} &eseconds. Don't move!");
+        messages.put("warmupCancelled", "&cTeleport cancelled - you moved!");
+        messages.put("warmupCountdown", "&eTeleporting in &a{seconds}&e...");
+        messages.put("teleportInProgress", "&cYou already have a teleport in progress!");
+        messages.put("couldNotGetPosition", "&cCould not get your position.");
         
         // ==================== TPA ====================
-        messages.put("tpaRequestSent", "Teleport request sent to {player}.");
-        messages.put("tpaRequestReceived", "{player} wants to teleport to you.");
-        messages.put("tpaRequestInstructions", "Type /tpaccept to accept or /tpdeny to deny.");
-        messages.put("tpaSelfRequest", "You cannot teleport to yourself.");
-        messages.put("tpaAlreadyPending", "You already have a pending request to this player.");
-        messages.put("tpaRequestFailed", "Could not send teleport request.");
-        messages.put("tpaNoPending", "You have no pending teleport requests.");
-        messages.put("tpaExpired", "Teleport request has expired.");
-        messages.put("tpaPlayerOffline", "{player} is no longer online.");
-        messages.put("tpaAccepted", "Teleport request accepted! {player} will teleport to you shortly.");
-        messages.put("tpaAcceptedRequester", "{player} accepted your teleport request!");
-        messages.put("tpaRequesterWarmup", "Teleporting to {player} in {seconds} seconds... Stand still!");
-        messages.put("tpaRequesterInProgress", "The requester already has a teleport in progress.");
-        messages.put("tpaDenied", "Teleport request from {player} denied.");
-        messages.put("tpaDeniedRequester", "{player} denied your teleport request.");
-        messages.put("tpaCouldNotFindRequester", "Could not find requester.");
-        messages.put("tpaCouldNotGetRequesterPosition", "Could not get requester's position.");
+        messages.put("tpaRequestSent", "&aTeleport request sent to &f{player}&a.");
+        messages.put("tpaRequestReceived", "&e{player} &awants to teleport to you.");
+        messages.put("tpaRequestInstructions", "&7Type &a/tpaccept &7to accept or &c/tpdeny &7to deny.");
+        messages.put("tpaSelfRequest", "&cYou cannot teleport to yourself.");
+        messages.put("tpaAlreadyPending", "&cYou already have a pending request to this player.");
+        messages.put("tpaRequestFailed", "&cCould not send teleport request.");
+        messages.put("tpaNoPending", "&cYou have no pending teleport requests.");
+        messages.put("tpaExpired", "&cTeleport request has expired.");
+        messages.put("tpaPlayerOffline", "&c{player} is no longer online.");
+        messages.put("tpaAccepted", "&aTeleport request accepted! &f{player} &awill teleport to you shortly.");
+        messages.put("tpaAcceptedRequester", "&a{player} accepted your teleport request!");
+        messages.put("tpaRequesterWarmup", "&eTeleporting to &f{player} &ein &a{seconds} &eseconds... Stand still!");
+        messages.put("tpaRequesterInProgress", "&cThe requester already has a teleport in progress.");
+        messages.put("tpaDenied", "&cTeleport request from &f{player} &cdenied.");
+        messages.put("tpaDeniedRequester", "&c{player} denied your teleport request.");
+        messages.put("tpaCouldNotFindRequester", "&cCould not find requester.");
+        messages.put("tpaCouldNotGetRequesterPosition", "&cCould not get requester's position.");
         
         // ==================== TPAHERE ====================
-        messages.put("tpahereRequestSent", "Teleport request sent to {player}. They will teleport to you if they accept.");
-        messages.put("tpahereRequestReceived", "{player} wants you to teleport to them.");
+        messages.put("tpahereRequestSent", "&aTeleport request sent to &f{player}&a. They will teleport to you if they accept.");
+        messages.put("tpahereRequestReceived", "&e{player} &awants you to teleport to them.");
         
         // ==================== TPHERE (Admin) ====================
-        messages.put("tphereSuccess", "Teleported {player} to your location.");
-        messages.put("tphereTeleported", "You have been teleported to {player}.");
-        messages.put("tphereSelf", "You cannot teleport yourself to yourself!");
+        messages.put("tphereSuccess", "&aTeleported &f{player} &ato your location.");
+        messages.put("tphereTeleported", "&eYou have been teleported to &f{player}&e.");
+        messages.put("tphereSelf", "&cYou cannot teleport yourself to yourself!");
         
         // ==================== HOMES ====================
-        messages.put("homeNoHomes", "You have no homes set. Use /sethome to create one.");
-        messages.put("homeListHeader", "Your homes ({count}/{max}):");
-        messages.put("homeNotFound", "Home '{name}' not found.");
-        messages.put("homeNoHomeSet", "You don't have a home set. Use /sethome first.");
-        messages.put("homeTeleported", "Teleported to home '{name}'.");
-        messages.put("homeWarmup", "Teleporting to home '{name}' in {seconds} seconds... Stand still!");
-        messages.put("homeSet", "Home '{name}' has been set!");
-        messages.put("homeLimitReached", "You have reached your home limit ({max}).");
-        messages.put("homeInvalidName", "Invalid home name.");
-        messages.put("homeSetFailed", "Failed to set home.");
-        messages.put("homeDeleted", "Home '{name}' has been deleted.");
-        messages.put("homeDeleteFailed", "Failed to delete home.");
-        messages.put("cannotSetHomeInInstance", "You cannot set a home in a temporary instance world!");
+        messages.put("homeNoHomes", "&eYou have no homes set. Use &a/sethome &eto create one.");
+        messages.put("homeListHeader", "&aYour homes &7({count}/{max})&a:");
+        messages.put("homeNotFound", "&cHome &e'{name}' &cnot found.");
+        messages.put("homeNoHomeSet", "&eYou don't have a home set. Use &a/sethome &efirst.");
+        messages.put("homeTeleported", "&aTeleported to home &e'{name}'&a.");
+        messages.put("homeWarmup", "&eTeleporting to home &a'{name}' &ein &a{seconds} &eseconds... Stand still!");
+        messages.put("homeSet", "&aHome &e'{name}' &ahas been set!");
+        messages.put("homeLimitReached", "&cYou have reached your home limit &7({max})&c.");
+        messages.put("homeInvalidName", "&cInvalid home name.");
+        messages.put("homeSetFailed", "&cFailed to set home.");
+        messages.put("homeDeleted", "&aHome &e'{name}' &ahas been deleted.");
+        messages.put("homeDeleteFailed", "&cFailed to delete home.");
+        messages.put("cannotSetHomeInInstance", "&cYou cannot set a home in a temporary instance world!");
         
         // ==================== WARPS ====================
-        messages.put("warpNoWarps", "No warps available.");
-        messages.put("warpListHeader", "Available warps: ");
-        messages.put("warpNotFound", "Warp '{name}' not found. Available: {list}");
-        messages.put("warpNoPermission", "You don't have permission to use this warp.");
-        messages.put("warpTeleported", "Teleported to warp '{name}'.");
-        messages.put("warpWarmup", "Teleporting to warp '{name}' in {seconds} seconds... Stand still!");
-        messages.put("warpCreated", "Created warp '{name}' for {permission} at {location}.");
-        messages.put("warpUpdated", "Updated warp '{name}' for {permission} at {location}.");
-        messages.put("warpInvalidPermission", "Invalid permission '{value}'. Use 'all' or 'op'.");
-        messages.put("warpDeleted", "Deleted warp '{name}'.");
-        messages.put("warpDeleteFailed", "Failed to delete warp.");
-        messages.put("warpListTitle", "=== Server Warps ===");
-        messages.put("warpListFooter", "Use /warp <name> to teleport.");
-        messages.put("cannotSetWarpInInstance", "You cannot set a warp in a temporary instance world!");
+        messages.put("warpNoWarps", "&cNo warps available.");
+        messages.put("warpListHeader", "&aAvailable warps: &f");
+        messages.put("warpNotFound", "&cWarp &e'{name}' &cnot found. Available: &7{list}");
+        messages.put("warpNoPermission", "&cYou don't have permission to use this warp.");
+        messages.put("warpTeleported", "&aTeleported to warp &e'{name}'&a.");
+        messages.put("warpWarmup", "&eTeleporting to warp &a'{name}' &ein &a{seconds} &eseconds... Stand still!");
+        messages.put("warpCreated", "&aCreated warp &e'{name}' &afor &7{permission} &aat &7{location}&a.");
+        messages.put("warpUpdated", "&aUpdated warp &e'{name}' &afor &7{permission} &aat &7{location}&a.");
+        messages.put("warpInvalidPermission", "&cInvalid permission &e'{value}'&c. Use &7'all' &cor &7'op'&c.");
+        messages.put("warpDeleted", "&aDeleted warp &e'{name}'&a.");
+        messages.put("warpDeleteFailed", "&cFailed to delete warp.");
+        messages.put("warpListTitle", "&b&l=== &fServer Warps &b&l===");
+        messages.put("warpListFooter", "&7Use &a/warp <name> &7to teleport.");
+        messages.put("cannotSetWarpInInstance", "&cYou cannot set a warp in a temporary instance world!");
         
         // ==================== WARP ADMIN ====================
-        messages.put("warpAdminNoWarps", "No warps configured.");
-        messages.put("warpAdminCreateHint", "Use /setwarp <name> [all|op] to create one.");
-        messages.put("warpAdminTitle", "=== Warp Admin Panel ===");
-        messages.put("warpAdminTotal", "Total warps: {count}");
-        messages.put("warpAdminCommands", "Commands:");
-        messages.put("warpAdminInfoTitle", "=== Warp: {name} ===");
-        messages.put("warpAdminPermissionUpdated", "Warp '{name}' permission updated to {permission}.");
+        messages.put("warpAdminNoWarps", "&cNo warps configured.");
+        messages.put("warpAdminCreateHint", "&7Use &a/setwarp <name> [all|op] &7to create one.");
+        messages.put("warpAdminTitle", "&b&l=== &fWarp Admin Panel &b&l===");
+        messages.put("warpAdminTotal", "&7Total warps: &a{count}");
+        messages.put("warpAdminCommands", "&eCommands:");
+        messages.put("warpAdminInfoTitle", "&b&l=== &fWarp: &e{name} &b&l===");
+        messages.put("warpAdminPermissionUpdated", "&aWarp &e'{name}' &apermission updated to &7{permission}&a.");
         
         // ==================== BACK ====================
-        messages.put("backNoLocation", "No previous location to go back to.");
-        messages.put("backTeleported", "Teleported to your previous location.");
-        messages.put("backWarmup", "Teleporting back in {seconds} seconds... Stand still!");
+        messages.put("backNoLocation", "&cNo previous location to go back to.");
+        messages.put("backTeleported", "&aTeleported to your previous location.");
+        messages.put("backWarmup", "&eTeleporting back in &a{seconds} &eseconds... Stand still!");
         
         // ==================== SPAWN ====================
-        messages.put("spawnNoSpawn", "No spawn point configured for this world.");
-        messages.put("spawnNoSpawn", "No spawn point set. An admin must use /setspawn first.");
-        messages.put("spawnNotFound", "Could not find spawn point.");
-        messages.put("spawnTeleported", "Teleported to spawn!");
-        messages.put("spawnWarmup", "Teleporting to spawn in {seconds} seconds... Stand still!");
+        messages.put("spawnNoSpawn", "&cNo spawn point set. An admin must use &e/setspawn &cfirst.");
+        messages.put("spawnNotFound", "&cCould not find spawn point.");
+        messages.put("spawnTeleported", "&aTeleported to spawn!");
+        messages.put("spawnWarmup", "&eTeleporting to spawn in &a{seconds} &eseconds... Stand still!");
         
         // ==================== RTP ====================
-        messages.put("rtpSearching", "Searching for a safe location...");
-        messages.put("rtpPreparing", "Preparing random teleport... Stand still for {seconds} seconds!");
-        messages.put("rtpTeleported", "Teleported to {location}.");
-        messages.put("rtpFailed", "Could not find a safe location after {attempts} attempts. Try again.");
-        messages.put("rtpCouldNotDeterminePosition", "Could not determine your position.");
+        messages.put("rtpSearching", "&eSearching for a safe location...");
+        messages.put("rtpPreparing", "&ePreparing random teleport... Stand still for &a{seconds} &eseconds!");
+        messages.put("rtpTeleported", "&aTeleported to &7{location}&a.");
+        messages.put("rtpFailed", "&cCould not find a safe location after &e{attempts} &cattempts. Try again.");
+        messages.put("rtpCouldNotDeterminePosition", "&cCould not determine your position.");
         
         // ==================== SLEEP ====================
-        messages.put("sleepProgress", "{sleeping}/{needed} players sleeping...");
-        messages.put("sleepSkipping", "{sleeping}/{needed} players sleeping - Skipping to morning!");
+        messages.put("sleepProgress", "&e{sleeping}&7/&e{needed} &7players sleeping...");
+        messages.put("sleepSkipping", "&a{sleeping}&7/&a{needed} &aplayers sleeping - Skipping to morning!");
         
         // ==================== GOD MODE ====================
-        messages.put("godEnabled", "God mode enabled. You are now invincible!");
-        messages.put("godDisabled", "God mode disabled.");
+        messages.put("godEnabled", "&aGod mode enabled. You are now invincible!");
+        messages.put("godDisabled", "&cGod mode disabled.");
         
         // ==================== HEAL ====================
-        messages.put("healSuccess", "You have been healed to full health!");
-        messages.put("healFailed", "Could not heal you.");
+        messages.put("healSuccess", "&aYou have been healed to full health!");
+        messages.put("healFailed", "&cCould not heal you.");
         
         // ==================== PRIVATE MESSAGING ====================
-        messages.put("msgUsage", "Usage: /msg <player> <message>");
-        messages.put("msgSelf", "You cannot message yourself.");
-        messages.put("msgSent", "[To {player}] {message}");
-        messages.put("msgReceived", "[From {player}] {message}");
-        messages.put("replyNoOne", "You have no one to reply to.");
-        messages.put("replyOffline", "That player is no longer online.");
-        messages.put("replyUsage", "Usage: /reply <message>");
+        messages.put("msgUsage", "&cUsage: &e/msg <player> <message>");
+        messages.put("msgSelf", "&cYou cannot message yourself.");
+        messages.put("msgSent", "&d[To &f{player}&d] &7{message}");
+        messages.put("msgReceived", "&d[From &f{player}&d] &7{message}");
+        messages.put("replyNoOne", "&cYou have no one to reply to.");
+        messages.put("replyOffline", "&cThat player is no longer online.");
+        messages.put("replyUsage", "&cUsage: &e/reply <message>");
         
         // ==================== FLY ====================
-        messages.put("flyEnabled", "Flight mode enabled! Double-tap jump to fly.");
-        messages.put("flyDisabled", "Flight mode disabled.");
-        messages.put("flyFailed", "Could not access movement settings.");
-        messages.put("flySpeedSet", "Fly speed set to {speed}x.");
-        messages.put("flySpeedReset", "Fly speed reset to default.");
-        messages.put("flySpeedInvalid", "Invalid speed value. Use a number (10-100) or 'reset'.");
-        messages.put("flySpeedOutOfRange", "Speed must be between 10 and 100, or use 'reset'.");
+        messages.put("flyEnabled", "&aFlight mode enabled! Double-tap jump to fly.");
+        messages.put("flyDisabled", "&cFlight mode disabled.");
+        messages.put("flyFailed", "&cCould not access movement settings.");
+        messages.put("flySpeedSet", "&aFly speed set to &e{speed}x&a.");
+        messages.put("flySpeedReset", "&aFly speed reset to default.");
+        messages.put("flySpeedInvalid", "&cInvalid speed value. Use a number &7(10-100) &cor &e'reset'&c.");
+        messages.put("flySpeedOutOfRange", "&cSpeed must be between &e10 &cand &e100&c, or use &e'reset'&c.");
         
         // ==================== TOP ====================
-        messages.put("topTeleported", "Teleported to the top!");
-        messages.put("topChunkNotLoaded", "Chunk not loaded.");
-        messages.put("topNoGround", "No solid ground found above.");
+        messages.put("topTeleported", "&aTeleported to the top!");
+        messages.put("topChunkNotLoaded", "&cChunk not loaded.");
+        messages.put("topNoGround", "&cNo solid ground found above.");
         
         // ==================== KITS ====================
-        messages.put("kitNoKits", "No kits are available.");
-        messages.put("kitNotFound", "Kit not found.");
-        messages.put("kitNoPermission", "You don't have permission to use this kit.");
-        messages.put("kitOnCooldown", "This kit is on cooldown. {time} remaining.");
-        messages.put("kitAlreadyClaimed", "You have already claimed this one-time kit.");
-        messages.put("kitClaimed", "You received the {kit} kit!");
-        messages.put("kitClaimFailed", "Could not claim kit.");
-        messages.put("kitOpenFailed", "Could not open kit menu.");
+        messages.put("kitNoKits", "&cNo kits are available.");
+        messages.put("kitNotFound", "&cKit not found.");
+        messages.put("kitNoPermission", "&cYou don't have permission to use this kit.");
+        messages.put("kitOnCooldown", "&cThis kit is on cooldown. &e{time} &cremaining.");
+        messages.put("kitAlreadyClaimed", "&cYou have already claimed this one-time kit.");
+        messages.put("kitClaimed", "&aYou received the &e{kit} &akit!");
+        messages.put("kitClaimFailed", "&cCould not claim kit.");
+        messages.put("kitOpenFailed", "&cCould not open kit menu.");
         
         // ==================== MOTD ====================
-        messages.put("motdTitle", "=== Message of the Day ===");
-        messages.put("motdLine1", "Welcome to the server!");
-        messages.put("motdLine2", "Type /help for commands.");
-        messages.put("motdLine3", "Have fun!");
-        
-        // ==================== MOTD ====================
-        messages.put("motdEmpty", "No MOTD configured.");
+        messages.put("motdTitle", "&b&l=== &fMessage of the Day &b&l===");
+        messages.put("motdLine1", "&aWelcome to the server!");
+        messages.put("motdLine2", "&7Type &e/help &7for commands.");
+        messages.put("motdLine3", "&aHave fun!");
+        messages.put("motdEmpty", "&cNo MOTD configured.");
         
         // ==================== RULES ====================
-        messages.put("rulesEmpty", "No rules configured.");
+        messages.put("rulesEmpty", "&cNo rules configured.");
         
         // ==================== JOIN MESSAGES ====================
-        messages.put("joinMessage", "{player} joined the server.");
-        messages.put("firstJoinMessage", "{player} joined the server for the first time! Welcome!");
+        messages.put("joinMessage", "&e{player} &7joined the server.");
+        messages.put("firstJoinMessage", "&e{player} &ajoined the server for the first time! Welcome!");
         
         // ==================== BROADCAST ====================
-        messages.put("broadcast", "[BROADCAST] {message}");
+        messages.put("broadcast", "&6&l[BROADCAST] &r&e{message}");
         
         // ==================== CLEAR INVENTORY ====================
-        messages.put("clearInvSuccess", "Cleared {count} items from your inventory.");
-        messages.put("clearInvFailed", "Could not clear inventory.");
+        messages.put("clearInvSuccess", "&aCleared &e{count} &aitems from your inventory.");
+        messages.put("clearInvFailed", "&cCould not clear inventory.");
         
         // ==================== LIST (Online Players) ====================
-        messages.put("listHeader", "Online Players ({count}/{max}):");
-        messages.put("listPlayers", "{players}");
-        messages.put("listNoPlayers", "No players online.");
+        messages.put("listHeader", "&aOnline Players &7({count}/{max})&a:");
+        messages.put("listPlayers", "&f{players}");
+        messages.put("listNoPlayers", "&cNo players online.");
     }
 
     // ==================== RTP (Random Teleport) ====================

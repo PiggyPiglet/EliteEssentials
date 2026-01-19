@@ -6,6 +6,7 @@ import com.eliteessentials.events.StarterKitEvent;
 import com.eliteessentials.integration.LuckPermsIntegration;
 import com.eliteessentials.listeners.ChatListener;
 import com.eliteessentials.listeners.JoinQuitListener;
+import com.eliteessentials.listeners.RespawnListener;
 import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.CooldownService;
 import com.eliteessentials.services.DamageTrackingService;
@@ -74,6 +75,7 @@ public class EliteEssentials extends JavaPlugin {
     private PlayerDeathSystem playerDeathSystem;
     private DamageTrackingSystem damageTrackingSystem;
     private SpawnProtectionSystem spawnProtectionSystem;
+    private RespawnListener respawnListener;
     private StarterKitEvent starterKitEvent;
     private JoinQuitListener joinQuitListener;
     private ChatListener chatListener;
@@ -214,6 +216,15 @@ public class EliteEssentials extends JavaPlugin {
             }
         }
         
+        // Register respawn system (handles respawning at spawn if no bed is set)
+        try {
+            respawnListener = new RespawnListener(spawnStorage);
+            EntityStore.REGISTRY.registerSystem(respawnListener);
+            getLogger().at(Level.INFO).log("RespawnListener registered - players without beds will respawn at /setspawn location!");
+        } catch (Exception e) {
+            getLogger().at(Level.WARNING).log("Could not register respawn system: " + e.getMessage());
+        }
+        
         getLogger().at(Level.INFO).log("EliteEssentials started successfully!");
     }
 
@@ -232,6 +243,13 @@ public class EliteEssentials extends JavaPlugin {
         if (playerDeathSystem != null) {
             try {
                 EntityStore.REGISTRY.unregisterSystem(PlayerDeathSystem.class);
+            } catch (Exception e) {
+                // Ignore unregister errors
+            }
+        }
+        if (respawnListener != null) {
+            try {
+                EntityStore.REGISTRY.unregisterSystem(RespawnListener.class);
             } catch (Exception e) {
                 // Ignore unregister errors
             }

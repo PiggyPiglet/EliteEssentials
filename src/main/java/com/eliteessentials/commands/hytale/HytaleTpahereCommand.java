@@ -9,14 +9,16 @@ import com.eliteessentials.util.CommandPermissionUtil;
 import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+import java.util.List;
 
 /**
  * Command: /tpahere <player>
@@ -30,14 +32,13 @@ public class HytaleTpahereCommand extends AbstractPlayerCommand {
     private static final String COMMAND_NAME = "tpahere";
     
     private final TpaService tpaService;
-    private final RequiredArg<PlayerRef> targetArg;
+    private final RequiredArg<String> targetArg;
 
     public HytaleTpahereCommand(TpaService tpaService) {
         super(COMMAND_NAME, "Request a player to teleport to you");
         this.tpaService = tpaService;
-        this.targetArg = withRequiredArg("player", "Target player", ArgTypes.PLAYER_REF);
-        
-        // Permission check handled in execute() via CommandPermissionUtil
+        // Use STRING instead of PLAYER_REF to show custom error message
+        this.targetArg = withRequiredArg("player", "Target player", ArgTypes.STRING);
     }
 
     @Override
@@ -54,10 +55,14 @@ public class HytaleTpahereCommand extends AbstractPlayerCommand {
         }
         
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
-        PlayerRef target = ctx.get(targetArg);
+        String targetName = ctx.get(targetArg);
+        
+        // Find target player by name
+        PlayerRef target = findPlayer(targetName);
         
         if (target == null) {
-            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(
+                configManager.getMessage("playerNotFound", "player", targetName), "#FF5555"));
             return;
         }
         
@@ -82,5 +87,18 @@ public class HytaleTpahereCommand extends AbstractPlayerCommand {
             case ALREADY_PENDING -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaAlreadyPending"), "#FF5555"));
             default -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaRequestFailed"), "#FF5555"));
         }
+    }
+    
+    /**
+     * Find a player by name (case-insensitive).
+     */
+    private PlayerRef findPlayer(String name) {
+        List<PlayerRef> players = Universe.get().getPlayers();
+        for (PlayerRef p : players) {
+            if (p.getUsername().equalsIgnoreCase(name)) {
+                return p;
+            }
+        }
+        return null;
     }
 }

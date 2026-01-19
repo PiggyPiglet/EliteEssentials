@@ -2,6 +2,22 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.0.8] - 2026-01-19
+
+### Fixed
+
+- **Thread safety in join listener**: Fixed potential "Assert not in thread!" error on player join
+  - `onPlayerJoin` now wraps store component access in `world.execute()` for thread safety
+  - Prevents race condition if `PlayerReadyEvent` fires from a non-world thread
+  - Re-validates entity ref inside execute block in case it becomes invalid between scheduling and execution
+
+### Changed
+
+- **Custom "player not found" message**: TPA commands now show customizable error when target player is offline
+  - `/tpa`, `/tpahere`, `/tphere` now use string argument with manual player lookup
+  - Message includes player name: `Player 'name' is not online.`
+  - Configurable via `playerNotFound` message with `{player}` placeholder
+
 ## [1.0.7] - 2026-01-18
 
 ### Added

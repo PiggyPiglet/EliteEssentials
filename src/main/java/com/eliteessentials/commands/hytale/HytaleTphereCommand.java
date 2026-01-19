@@ -20,8 +20,11 @@ import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+import java.util.List;
 
 /**
  * Command: /tphere <player>
@@ -38,12 +41,13 @@ public class HytaleTphereCommand extends AbstractPlayerCommand {
     private static final String COMMAND_NAME = "tphere";
     
     private final BackService backService;
-    private final RequiredArg<PlayerRef> targetArg;
+    private final RequiredArg<String> targetArg;
 
     public HytaleTphereCommand(BackService backService) {
         super(COMMAND_NAME, "Teleport a player to your location");
         this.backService = backService;
-        this.targetArg = withRequiredArg("player", "Target player", ArgTypes.PLAYER_REF);
+        // Use STRING instead of PLAYER_REF to show custom error message
+        this.targetArg = withRequiredArg("player", "Target player", ArgTypes.STRING);
     }
 
     @Override
@@ -60,10 +64,14 @@ public class HytaleTphereCommand extends AbstractPlayerCommand {
         }
         
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
-        PlayerRef target = ctx.get(targetArg);
+        String targetName = ctx.get(targetArg);
+        
+        // Find target player by name
+        PlayerRef target = findPlayer(targetName);
         
         if (target == null) {
-            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(
+                configManager.getMessage("playerNotFound", "player", targetName), "#FF5555"));
             return;
         }
         
@@ -76,13 +84,15 @@ public class HytaleTphereCommand extends AbstractPlayerCommand {
         // Get target's entity ref
         Ref<EntityStore> targetRef = target.getReference();
         if (targetRef == null || !targetRef.isValid()) {
-            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(
+                configManager.getMessage("playerNotFound", "player", targetName), "#FF5555"));
             return;
         }
         
         Store<EntityStore> targetStore = targetRef.getStore();
         if (targetStore == null) {
-            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(
+                configManager.getMessage("playerNotFound", "player", targetName), "#FF5555"));
             return;
         }
         
@@ -131,5 +141,18 @@ public class HytaleTphereCommand extends AbstractPlayerCommand {
             "player", target.getUsername()), "#55FF55"));
         target.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tphereTeleported", 
             "player", player.getUsername()), "#FFFF55"));
+    }
+    
+    /**
+     * Find a player by name (case-insensitive).
+     */
+    private PlayerRef findPlayer(String name) {
+        List<PlayerRef> players = Universe.get().getPlayers();
+        for (PlayerRef p : players) {
+            if (p.getUsername().equalsIgnoreCase(name)) {
+                return p;
+            }
+        }
+        return null;
     }
 }
