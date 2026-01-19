@@ -6,6 +6,7 @@ import com.eliteessentials.config.PluginConfig;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.WarpService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -57,16 +58,16 @@ public class HytaleDelWarpCommand extends AbstractPlayerCommand {
         String warpName = ctx.get(nameArg);
         
         if (!warpService.warpExists(warpName)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpNotFound", "name", warpName, "list", "")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpNotFound", "name", warpName, "list", ""), "#FF5555"));
             return;
         }
         
         boolean deleted = warpService.deleteWarp(warpName);
         
         if (deleted) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpDeleted", "name", warpName)).color("#55FF55"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpDeleted", "name", warpName), "#55FF55"));
         } else {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpDeleteFailed")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpDeleteFailed"), "#FF5555"));
         }
     }
 }

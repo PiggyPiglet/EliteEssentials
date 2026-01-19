@@ -11,6 +11,7 @@ import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.WarpService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -85,7 +86,7 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
             .collect(Collectors.toList());
         
         if (accessibleWarps.isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpNoWarps")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpNoWarps"), "#FF5555"));
             return;
         }
         
@@ -100,7 +101,7 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
                 .collect(Collectors.joining(", "));
         
         ctx.sendMessage(Message.join(
-            Message.raw(configManager.getMessage("warpListHeader")).color("#55FF55"),
+            MessageFormatter.formatWithFallback(configManager.getMessage("warpListHeader"), "#55FF55"),
             Message.raw(warpList).color("#FFFFFF")
         ));
     }
@@ -120,7 +121,7 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
         
         // Check if already warming up
         if (warmupService.hasActiveWarmup(playerId)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("teleportInProgress")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("teleportInProgress"), "#FF5555"));
             return;
         }
         
@@ -131,10 +132,10 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
                 .filter(w -> perms.canAccessWarp(playerId, w.getName(), w.getPermission()))
                 .collect(Collectors.toList());
             if (available.isEmpty()) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("warpNoWarps")).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpNoWarps"), "#FF5555"));
             } else {
                 String warpList = available.stream().map(Warp::getName).collect(Collectors.joining(", "));
-                ctx.sendMessage(Message.raw(configManager.getMessage("warpNotFound", "name", warpName, "list", warpList)).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpNotFound", "name", warpName, "list", warpList), "#FF5555"));
             }
             return;
         }
@@ -143,7 +144,7 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
         
         // Check permission using PermissionService
         if (!perms.canAccessWarp(playerId, warp.getName(), warp.getPermission())) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpNoPermission")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpNoPermission"), "#FF5555"));
             return;
         }
         
@@ -152,7 +153,7 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
         // Get current position for warmup and /back
         TransformComponent transform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
         
@@ -186,7 +187,7 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
-                ctx.sendMessage(Message.raw(configManager.getMessage("warpTeleported", "name", finalWarpName)).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpTeleported", "name", finalWarpName), "#55FF55"));
             });
         };
 
@@ -194,7 +195,7 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
         int warmupSeconds = CommandPermissionUtil.getEffectiveWarmup(playerId, COMMAND_NAME, config.warps.warmupSeconds);
         
         if (warmupSeconds > 0) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpWarmup", "name", finalWarpName, "seconds", String.valueOf(warmupSeconds))).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpWarmup", "name", finalWarpName, "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
         }
         warmupService.startWarmup(player, currentPos, warmupSeconds, doTeleport, COMMAND_NAME, world, store, ref);
     }

@@ -5,6 +5,7 @@ import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.TpaService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -55,7 +56,7 @@ public class HytaleTpaCommand extends AbstractPlayerCommand {
         PlayerRef target = ctx.get(targetArg);
         
         if (target == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("playerNotFound")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
             return;
         }
         
@@ -69,15 +70,15 @@ public class HytaleTpaCommand extends AbstractPlayerCommand {
         
         switch (result) {
             case REQUEST_SENT -> {
-                ctx.sendMessage(Message.raw(configManager.getMessage("tpaRequestSent", "player", target.getUsername())).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaRequestSent", "player", target.getUsername()), "#55FF55"));
                 
                 // Send notification to target player with instructions
-                target.sendMessage(Message.raw(configManager.getMessage("tpaRequestReceived", "player", player.getUsername())).color("#FFFF55"));
-                target.sendMessage(Message.raw(configManager.getMessage("tpaRequestInstructions")).color("#AAAAAA"));
+                target.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaRequestReceived", "player", player.getUsername()), "#FFFF55"));
+                target.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaRequestInstructions"), "#AAAAAA"));
             }
-            case SELF_REQUEST -> ctx.sendMessage(Message.raw(configManager.getMessage("tpaSelfRequest")).color("#FF5555"));
-            case ALREADY_PENDING -> ctx.sendMessage(Message.raw(configManager.getMessage("tpaAlreadyPending")).color("#FF5555"));
-            default -> ctx.sendMessage(Message.raw(configManager.getMessage("tpaRequestFailed")).color("#FF5555"));
+            case SELF_REQUEST -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaSelfRequest"), "#FF5555"));
+            case ALREADY_PENDING -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaAlreadyPending"), "#FF5555"));
+            default -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaRequestFailed"), "#FF5555"));
         }
     }
 }

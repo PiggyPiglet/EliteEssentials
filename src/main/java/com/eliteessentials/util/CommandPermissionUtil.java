@@ -3,7 +3,6 @@ package com.eliteessentials.util;
 import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.PermissionService;
-import com.eliteessentials.permissions.Permissions;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
@@ -32,7 +31,7 @@ public class CommandPermissionUtil {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
         
         if (!perms.canUseEveryoneCommand(player.getUuid(), permission, enabled)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("noPermission")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
             return false;
         }
         
@@ -48,7 +47,7 @@ public class CommandPermissionUtil {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
         
         if (!perms.canUseAdminCommand(player.getUuid(), permission, enabled)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("noPermission")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
             return false;
         }
         
@@ -64,7 +63,7 @@ public class CommandPermissionUtil {
         CommandSender sender = ctx.sender();
         
         if (!perms.canUseAdminCommand(sender, permission, enabled)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("noPermission")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
             return false;
         }
         
@@ -87,7 +86,7 @@ public class CommandPermissionUtil {
             return true;
         }
         
-        ctx.sendMessage(Message.raw(configManager.getMessage("commandDisabled")).color("#FF5555"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("commandDisabled"), "#FF5555"));
         return false;
     }
 
@@ -130,7 +129,7 @@ public class CommandPermissionUtil {
      */
     public static void sendNoPermission(CommandContext ctx) {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
-        ctx.sendMessage(Message.raw(configManager.getMessage("noPermission")).color("#FF5555"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
     }
 
     /**
@@ -138,6 +137,6 @@ public class CommandPermissionUtil {
      */
     public static void sendCommandDisabled(CommandContext ctx) {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
-        ctx.sendMessage(Message.raw(configManager.getMessage("commandDisabled")).color("#FF5555"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("commandDisabled"), "#FF5555"));
     }
 }

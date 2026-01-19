@@ -8,6 +8,7 @@ import com.eliteessentials.model.Warp;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.WarpService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -103,7 +104,7 @@ public class HytaleSetWarpCommand extends AbstractPlayerCommand {
         // Block setting warps in instance worlds (temporary worlds that close)
         String worldName = world.getName();
         if (worldName.startsWith("instance-")) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("cannotSetWarpInInstance")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("cannotSetWarpInInstance"), "#FF5555"));
             return;
         }
         
@@ -115,14 +116,14 @@ public class HytaleSetWarpCommand extends AbstractPlayerCommand {
         } else if ("all".equals(permLower) || "everyone".equals(permLower)) {
             permission = Warp.Permission.ALL;
         } else {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpInvalidPermission", "value", permStr)).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpInvalidPermission", "value", permStr), "#FF5555"));
             return;
         }
         
         // Get player position
         TransformComponent transform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
         
@@ -151,9 +152,9 @@ public class HytaleSetWarpCommand extends AbstractPlayerCommand {
         String locationStr = String.format("%.1f, %.1f, %.1f", pos.getX(), pos.getY(), pos.getZ());
         
         if (isUpdate) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpUpdated", "name", warpName, "permission", permDisplay, "location", locationStr)).color("#55FF55"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpUpdated", "name", warpName, "permission", permDisplay, "location", locationStr), "#55FF55"));
         } else {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpCreated", "name", warpName, "permission", permDisplay, "location", locationStr)).color("#55FF55"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpCreated", "name", warpName, "permission", permDisplay, "location", locationStr), "#55FF55"));
         }
     }
 }

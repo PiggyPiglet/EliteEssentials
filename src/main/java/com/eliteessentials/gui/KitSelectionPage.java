@@ -6,6 +6,7 @@ import com.eliteessentials.model.KitItem;
 import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.KitService;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -13,7 +14,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
@@ -254,7 +254,7 @@ public class KitSelectionPage extends InteractiveCustomUIPage<KitSelectionPage.K
     }
 
     private void sendMessage(String message, String color) {
-        playerRef.sendMessage(Message.raw(message).color(color));
+        playerRef.sendMessage(MessageFormatter.formatWithFallback(message, color));
     }
 
     /**

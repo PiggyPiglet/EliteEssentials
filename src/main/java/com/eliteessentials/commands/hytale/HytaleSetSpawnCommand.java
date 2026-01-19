@@ -4,6 +4,7 @@ import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.storage.SpawnStorage;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Transform;
@@ -52,7 +53,7 @@ public class HytaleSetSpawnCommand extends AbstractPlayerCommand {
         // Get player position
         TransformComponent transform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw("Could not get your position.").color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback("Could not get your position.", "#FF5555"));
             return;
         }
 
@@ -73,8 +74,8 @@ public class HytaleSetSpawnCommand extends AbstractPlayerCommand {
         Transform spawnTransform = new Transform(spawnPosition, spawnRotation);
         world.getWorldConfig().setSpawnProvider(new GlobalSpawnProvider(spawnTransform));
 
-        ctx.sendMessage(Message.raw("Spawn set at " + 
+        ctx.sendMessage(MessageFormatter.formatWithFallback("Spawn set at " + 
             String.format("%.1f, %.1f, %.1f", pos.getX(), pos.getY(), pos.getZ()) + 
-            " (Players will now respawn here after death)").color("#55FF55"));
+            " (Players will now respawn here after death)", "#55FF55"));
     }
 }

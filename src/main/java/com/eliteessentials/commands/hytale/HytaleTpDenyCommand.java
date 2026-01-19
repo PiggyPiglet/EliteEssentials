@@ -6,6 +6,7 @@ import com.eliteessentials.model.TpaRequest;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.TpaService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -58,18 +59,18 @@ public class HytaleTpDenyCommand extends AbstractPlayerCommand {
         Optional<TpaRequest> requestOpt = tpaService.denyRequest(playerId);
 
         if (requestOpt.isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaNoPending")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaNoPending"), "#FF5555"));
             return;
         }
 
         TpaRequest request = requestOpt.get();
         
-        ctx.sendMessage(Message.raw(configManager.getMessage("tpaDenied", "player", request.getRequesterName())).color("#FF5555"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaDenied", "player", request.getRequesterName()), "#FF5555"));
         
         // Notify the requester that their request was denied
         PlayerRef requester = Universe.get().getPlayer(request.getRequesterId());
         if (requester != null && requester.isValid()) {
-            requester.sendMessage(Message.raw(configManager.getMessage("tpaDeniedRequester", "player", player.getUsername())).color("#FF5555"));
+            requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaDeniedRequester", "player", player.getUsername()), "#FF5555"));
         }
     }
 }

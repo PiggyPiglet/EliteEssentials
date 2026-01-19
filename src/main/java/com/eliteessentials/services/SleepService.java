@@ -1,13 +1,13 @@
 package com.eliteessentials.services;
 
 import com.eliteessentials.config.ConfigManager;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.builtin.beds.sleep.components.PlayerSleep;
 import com.hypixel.hytale.builtin.beds.sleep.components.PlayerSomnolence;
 import com.hypixel.hytale.builtin.beds.sleep.resources.WorldSlumber;
 import com.hypixel.hytale.builtin.beds.sleep.resources.WorldSomnolence;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.gameplay.SleepConfig;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -175,7 +175,7 @@ public class SleepService {
         String message = configManager.getMessage("sleepProgress", "sleeping", String.valueOf(sleeping), "needed", String.valueOf(needed));
         for (PlayerRef player : players) {
             try {
-                player.sendMessage(Message.raw(message).color("#FFFF55"));
+                player.sendMessage(MessageFormatter.formatWithFallback(message, "#FFFF55"));
             } catch (Exception e) {
                 // Ignore
             }
@@ -229,7 +229,7 @@ public class SleepService {
         String message = configManager.getMessage("sleepSkipping", "sleeping", String.valueOf(sleeping), "needed", String.valueOf(needed));
         for (PlayerRef player : players) {
             try {
-                player.sendMessage(Message.raw(message).color("#55FF55"));
+                player.sendMessage(MessageFormatter.formatWithFallback(message, "#55FF55"));
             } catch (Exception e) {
                 // Ignore
             }

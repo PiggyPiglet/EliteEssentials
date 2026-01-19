@@ -10,6 +10,7 @@ import com.eliteessentials.services.CooldownService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.storage.SpawnStorage;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -70,7 +71,7 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         if (!CommandPermissionUtil.canBypassCooldown(playerId, COMMAND_NAME)) {
             int cooldownRemaining = cooldownService.getCooldownRemaining(COMMAND_NAME, playerId);
             if (cooldownRemaining > 0) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("onCooldown", "seconds", String.valueOf(cooldownRemaining))).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("onCooldown", "seconds", String.valueOf(cooldownRemaining)), "#FF5555"));
                 return;
             }
         }
@@ -78,7 +79,7 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         // Get spawn from storage
         SpawnStorage.SpawnData spawn = spawnStorage.getSpawn();
         if (spawn == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("spawnNoSpawn")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnNoSpawn"), "#FF5555"));
             return;
         }
         
@@ -92,7 +93,7 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         // Get current position for /back and warmup
         TransformComponent currentTransform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (currentTransform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
         
@@ -122,7 +123,7 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
                 Teleport teleport = new Teleport(targetWorld, spawnPos, spawnRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
-                ctx.sendMessage(Message.raw(configManager.getMessage("spawnTeleported")).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnTeleported"), "#55FF55"));
             });
             
             // Set cooldown
@@ -133,7 +134,7 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         int warmupSeconds = CommandPermissionUtil.getEffectiveWarmup(playerId, COMMAND_NAME, config.spawn.warmupSeconds);
         
         if (warmupSeconds > 0) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("spawnWarmup", "seconds", String.valueOf(warmupSeconds))).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnWarmup", "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
         }
         warmupService.startWarmup(player, currentPos, warmupSeconds, doTeleport, COMMAND_NAME, world, store, ref);
     }

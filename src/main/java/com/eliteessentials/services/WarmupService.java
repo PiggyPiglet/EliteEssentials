@@ -2,6 +2,7 @@ package com.eliteessentials.services;
 
 import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -167,7 +168,7 @@ public class WarmupService {
         // Check if player moved (using squared distance like HomeManager)
         if (hasMoved(warmup.startPos, currentPos)) {
             pending.remove(warmup.playerUuid);
-            playerComponent.sendMessage(Message.raw(configManager.getMessage("warmupCancelled")).color("#FF5555"));
+            playerComponent.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warmupCancelled"), "#FF5555"));
             logger.info("[Warmup] Cancelled for " + warmup.playerUuid + " - player moved");
             return;
         }
@@ -199,7 +200,7 @@ public class WarmupService {
         int remainingSeconds = (int) Math.ceil(remainingNanos / 1_000_000_000.0);
         if (remainingSeconds != warmup.lastAnnouncedSeconds && remainingSeconds > 0) {
             warmup.lastAnnouncedSeconds = remainingSeconds;
-            playerComponent.sendMessage(Message.raw(configManager.getMessage("warmupCountdown", "seconds", String.valueOf(remainingSeconds))).color("#FFAA00"));
+            playerComponent.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warmupCountdown", "seconds", String.valueOf(remainingSeconds)), "#FFAA00"));
         }
     }
     

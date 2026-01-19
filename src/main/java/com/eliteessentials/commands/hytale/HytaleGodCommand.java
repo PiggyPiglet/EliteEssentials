@@ -5,6 +5,7 @@ import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.GodService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -57,11 +58,11 @@ public class HytaleGodCommand extends AbstractPlayerCommand {
         if (nowEnabled) {
             // Enable invulnerability
             store.putComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE);
-            ctx.sendMessage(Message.raw(configManager.getMessage("godEnabled")).color("#55FF55"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godEnabled"), "#55FF55"));
         } else {
             // Disable invulnerability
             store.removeComponent(ref, Invulnerable.getComponentType());
-            ctx.sendMessage(Message.raw(configManager.getMessage("godDisabled")).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godDisabled"), "#FFAA00"));
         }
     }
 }

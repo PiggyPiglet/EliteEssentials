@@ -6,6 +6,7 @@ import com.eliteessentials.model.Location;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.BackService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -62,26 +63,26 @@ public class HytaleTphereCommand extends AbstractPlayerCommand {
         PlayerRef target = ctx.get(targetArg);
         
         if (target == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("playerNotFound")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
             return;
         }
         
         // Can't teleport yourself
         if (target.getUuid().equals(player.getUuid())) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tphereSelf")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tphereSelf"), "#FF5555"));
             return;
         }
         
         // Get target's entity ref
         Ref<EntityStore> targetRef = target.getReference();
         if (targetRef == null || !targetRef.isValid()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("playerNotFound")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
             return;
         }
         
         Store<EntityStore> targetStore = targetRef.getStore();
         if (targetStore == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("playerNotFound")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("playerNotFound"), "#FF5555"));
             return;
         }
         
@@ -126,9 +127,9 @@ public class HytaleTphereCommand extends AbstractPlayerCommand {
         targetStore.putComponent(targetRef, Teleport.getComponentType(), teleport);
         
         // Send messages
-        ctx.sendMessage(Message.raw(configManager.getMessage("tphereSuccess", 
-            "player", target.getUsername())).color("#55FF55"));
-        target.sendMessage(Message.raw(configManager.getMessage("tphereTeleported", 
-            "player", player.getUsername())).color("#FFFF55"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tphereSuccess", 
+            "player", target.getUsername()), "#55FF55"));
+        target.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tphereTeleported", 
+            "player", player.getUsername()), "#FFFF55"));
     }
 }

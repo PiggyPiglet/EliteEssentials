@@ -5,6 +5,7 @@ import com.eliteessentials.gui.KitSelectionPage;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.KitService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -61,18 +62,18 @@ public class HytaleKitCommand extends AbstractPlayerCommand {
         try {
             playerComponent = store.getComponent(ref, Player.getComponentType());
         } catch (Exception e) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("kitOpenFailed")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("kitOpenFailed"), "#FF5555"));
             return;
         }
         
         if (playerComponent == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("kitOpenFailed")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("kitOpenFailed"), "#FF5555"));
             return;
         }
 
         // Check if there are any kits
         if (kitService.getAllKits().isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("kitNoKits")).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("kitNoKits"), "#FFAA00"));
             return;
         }
 

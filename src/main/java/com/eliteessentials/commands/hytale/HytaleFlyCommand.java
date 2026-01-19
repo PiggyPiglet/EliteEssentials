@@ -3,6 +3,7 @@ package com.eliteessentials.commands.hytale;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -52,7 +53,7 @@ public class HytaleFlyCommand extends AbstractPlayerCommand {
             // Get movement manager
             MovementManager movementManager = store.getComponent(ref, MovementManager.getComponentType());
             if (movementManager == null) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("flyFailed")).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flyFailed"), "#FF5555"));
                 return;
             }
 
@@ -66,9 +67,9 @@ public class HytaleFlyCommand extends AbstractPlayerCommand {
 
             // Send message
             if (newState) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("flyEnabled")).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flyEnabled"), "#55FF55"));
             } else {
-                ctx.sendMessage(Message.raw(configManager.getMessage("flyDisabled")).color("#FFAA00"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flyDisabled"), "#FFAA00"));
                 // NOTE: Disabling flight while airborne will leave you floating
                 // This is a Hytale API limitation - the active flying state is not exposed
                 // Workaround: Land before disabling fly, or change gamemode to reset state

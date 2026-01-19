@@ -8,6 +8,7 @@ import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.WarpService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -64,11 +65,11 @@ public class HytaleWarpsCommand extends AbstractPlayerCommand {
             .collect(Collectors.toList());
         
         if (accessibleWarps.isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpNoWarps")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpNoWarps"), "#FF5555"));
             return;
         }
         
-        ctx.sendMessage(Message.raw(configManager.getMessage("warpListTitle")).color("#55FFFF"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpListTitle"), "#55FFFF"));
         
         for (Warp warp : accessibleWarps) {
             String coords = String.format("%.0f, %.0f, %.0f", 
@@ -96,6 +97,6 @@ public class HytaleWarpsCommand extends AbstractPlayerCommand {
             ctx.sendMessage(line);
         }
         
-        ctx.sendMessage(Message.raw(configManager.getMessage("warpListFooter")).color("#AAAAAA"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpListFooter"), "#AAAAAA"));
     }
 }

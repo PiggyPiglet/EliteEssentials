@@ -6,6 +6,7 @@ import com.eliteessentials.model.Warp;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.WarpService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -63,13 +64,13 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
         Map<String, Warp> warps = warpService.getAllWarps();
         
         if (warps.isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpAdminNoWarps")).color("#FF5555"));
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpAdminCreateHint")).color("#AAAAAA"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminNoWarps"), "#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminCreateHint"), "#AAAAAA"));
             return;
         }
         
-        ctx.sendMessage(Message.raw(configManager.getMessage("warpAdminTitle")).color("#55FFFF"));
-        ctx.sendMessage(Message.raw(configManager.getMessage("warpAdminTotal", "count", String.valueOf(warps.size()))).color("#AAAAAA"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminTitle"), "#55FFFF"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminTotal", "count", String.valueOf(warps.size())), "#AAAAAA"));
         ctx.sendMessage(Message.raw("").color("#FFFFFF"));
         
         List<Warp> sortedWarps = warps.values().stream()
@@ -88,7 +89,7 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
         }
         
         ctx.sendMessage(Message.raw("").color("#FFFFFF"));
-        ctx.sendMessage(Message.raw(configManager.getMessage("warpAdminCommands")).color("#FFAA00"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminCommands"), "#FFAA00"));
         ctx.sendMessage(Message.raw("  /warpadmin info <name>").color("#AAAAAA"));
         ctx.sendMessage(Message.raw("  /warpadmin setperm <name> <all|op>").color("#AAAAAA"));
         ctx.sendMessage(Message.raw("  /setwarp <name> [all|op]").color("#AAAAAA"));
@@ -135,7 +136,7 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
             String createdDate = sdf.format(new Date(warp.getCreatedAt()));
             
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpAdminInfoTitle", "name", warp.getName())).color("#55FFFF"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminInfoTitle", "name", warp.getName()), "#55FFFF"));
             ctx.sendMessage(Message.join(
                 Message.raw("  Permission: ").color("#AAAAAA"),
                 Message.raw(warp.isOpOnly() ? "OP Only" : "Everyone").color(warp.isOpOnly() ? "#FF5555" : "#55FF55")
@@ -224,7 +225,7 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
             }
             
             String permDisplay = permission == Warp.Permission.OP ? "OP only" : "everyone";
-            ctx.sendMessage(Message.raw(configManager.getMessage("warpAdminPermissionUpdated", "name", warpName, "permission", permDisplay)).color("#55FF55"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminPermissionUpdated", "name", warpName, "permission", permDisplay), "#55FF55"));
         }
     }
 }

@@ -5,6 +5,7 @@ import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.HomeService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -56,7 +57,7 @@ public class HytaleHomesCommand extends AbstractPlayerCommand {
         Set<String> homes = homeService.getHomeNames(playerId);
         
         if (homes.isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("homeNoHomes")).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeNoHomes"), "#FFAA00"));
             return;
         }
 
@@ -65,7 +66,7 @@ public class HytaleHomesCommand extends AbstractPlayerCommand {
         String maxStr = max == Integer.MAX_VALUE ? "∞" : String.valueOf(max);
         
         ctx.sendMessage(Message.join(
-            Message.raw(configManager.getMessage("homeListHeader", "count", String.valueOf(count), "max", maxStr)).color("#55FF55"),
+            MessageFormatter.formatWithFallback(configManager.getMessage("homeListHeader", "count", String.valueOf(count), "max", maxStr), "#55FF55"),
             Message.raw(" ").color("#55FF55"),
             Message.raw(String.join(", ", homes)).color("#FFFFFF")
         ));

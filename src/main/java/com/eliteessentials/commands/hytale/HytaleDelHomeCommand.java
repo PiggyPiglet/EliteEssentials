@@ -5,6 +5,7 @@ import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.HomeService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -69,9 +70,9 @@ public class HytaleDelHomeCommand extends AbstractPlayerCommand {
         HomeService.Result result = homeService.deleteHome(playerId, homeName);
 
         switch (result) {
-            case SUCCESS -> ctx.sendMessage(Message.raw(configManager.getMessage("homeDeleted", "name", homeName)).color("#55FF55"));
-            case HOME_NOT_FOUND -> ctx.sendMessage(Message.raw(configManager.getMessage("homeNotFound", "name", homeName)).color("#FF5555"));
-            default -> ctx.sendMessage(Message.raw(configManager.getMessage("homeDeleteFailed")).color("#FF5555"));
+            case SUCCESS -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeDeleted", "name", homeName), "#55FF55"));
+            case HOME_NOT_FOUND -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeNotFound", "name", homeName), "#FF5555"));
+            default -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeDeleteFailed"), "#FF5555"));
         }
     }
     

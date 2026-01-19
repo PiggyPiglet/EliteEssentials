@@ -6,6 +6,7 @@ import com.eliteessentials.model.Location;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.HomeService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -77,13 +78,13 @@ public class HytaleSetHomeCommand extends AbstractPlayerCommand {
         // Block setting homes in instance worlds (temporary worlds that close)
         String worldName = world.getName();
         if (worldName.startsWith("instance-")) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("cannotSetHomeInInstance")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("cannotSetHomeInInstance"), "#FF5555"));
             return;
         }
         
         TransformComponent transform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
 
@@ -105,13 +106,13 @@ public class HytaleSetHomeCommand extends AbstractPlayerCommand {
         HomeService.Result result = homeService.setHome(playerId, homeName, location);
 
         switch (result) {
-            case SUCCESS -> ctx.sendMessage(Message.raw(configManager.getMessage("homeSet", "name", homeName)).color("#55FF55"));
+            case SUCCESS -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeSet", "name", homeName), "#55FF55"));
             case LIMIT_REACHED -> {
                 int max = homeService.getMaxHomes(playerId);
-                ctx.sendMessage(Message.raw(configManager.getMessage("homeLimitReached", "max", String.valueOf(max))).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeLimitReached", "max", String.valueOf(max)), "#FF5555"));
             }
-            case INVALID_NAME -> ctx.sendMessage(Message.raw(configManager.getMessage("homeInvalidName")).color("#FF5555"));
-            default -> ctx.sendMessage(Message.raw(configManager.getMessage("homeSetFailed")).color("#FF5555"));
+            case INVALID_NAME -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeInvalidName"), "#FF5555"));
+            default -> ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeSetFailed"), "#FF5555"));
         }
     }
     

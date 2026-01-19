@@ -4,6 +4,7 @@ import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.permissions.Permissions;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
@@ -45,7 +46,7 @@ public class HytaleListCommand extends CommandBase {
         PermissionService perms = PermissionService.get();
         if (!perms.canUseEveryoneCommand(ctx.sender(), Permissions.LIST, 
                 configManager.getConfig().list.enabled)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("noPermission")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
             return;
         }
         
@@ -63,17 +64,17 @@ public class HytaleListCommand extends CommandBase {
         String header = configManager.getMessage("listHeader", 
             "count", String.valueOf(playerCount),
             "max", String.valueOf(configManager.getConfig().list.maxPlayers));
-        ctx.sendMessage(Message.raw(header).color("#55FF55"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(header, "#55FF55"));
         
         // Send player list
         if (playerCount == 0) {
             String noPlayers = configManager.getMessage("listNoPlayers");
-            ctx.sendMessage(Message.raw(noPlayers).color("#AAAAAA"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(noPlayers, "#AAAAAA"));
         } else {
             // Join names with comma and space
             String playerList = String.join(", ", playerNames);
             String listMessage = configManager.getMessage("listPlayers", "players", playerList);
-            ctx.sendMessage(Message.raw(listMessage).color("#FFFFFF"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(listMessage, "#FFFFFF"));
         }
     }
 }

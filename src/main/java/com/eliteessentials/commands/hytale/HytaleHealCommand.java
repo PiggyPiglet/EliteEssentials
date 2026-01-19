@@ -4,6 +4,7 @@ import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -48,7 +49,7 @@ public class HytaleHealCommand extends AbstractPlayerCommand {
         // Get player's stat map
         EntityStatMap statMap = store.getComponent(ref, EntityStatMap.getComponentType());
         if (statMap == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("healFailed")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("healFailed"), "#FF5555"));
             return;
         }
 
@@ -56,6 +57,6 @@ public class HytaleHealCommand extends AbstractPlayerCommand {
         int healthStatIndex = DefaultEntityStatTypes.getHealth();
         statMap.maximizeStatValue(healthStatIndex);
 
-        ctx.sendMessage(Message.raw(configManager.getMessage("healSuccess")).color("#55FF55"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("healSuccess"), "#55FF55"));
     }
 }

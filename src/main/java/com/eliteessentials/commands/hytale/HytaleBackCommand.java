@@ -8,6 +8,7 @@ import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -67,7 +68,7 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
         
         // Check if already warming up
         if (warmupService.hasActiveWarmup(playerId)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("teleportInProgress")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("teleportInProgress"), "#FF5555"));
             return;
         }
         
@@ -75,7 +76,7 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
         Optional<Location> previousLocation = backService.peekLocation(playerId);
         
         if (previousLocation.isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("backNoLocation")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("backNoLocation"), "#FF5555"));
             return;
         }
 
@@ -84,7 +85,7 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
         // Get current position for warmup
         TransformComponent transform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
         
@@ -110,7 +111,7 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
-                ctx.sendMessage(Message.raw(configManager.getMessage("backTeleported")).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("backTeleported"), "#55FF55"));
             });
         };
 
@@ -118,7 +119,7 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
         int warmupSeconds = CommandPermissionUtil.getEffectiveWarmup(playerId, COMMAND_NAME, config.back.warmupSeconds);
         
         if (warmupSeconds > 0) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("backWarmup", "seconds", String.valueOf(warmupSeconds))).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("backWarmup", "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
         }
         warmupService.startWarmup(player, currentPos, warmupSeconds, doTeleport, COMMAND_NAME, world, store, ref);
     }

@@ -10,6 +10,7 @@ import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.HomeService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -86,7 +87,7 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
         
         // Check if already warming up
         if (warmupService.hasActiveWarmup(playerId)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("teleportInProgress")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("teleportInProgress"), "#FF5555"));
             return;
         }
         
@@ -95,11 +96,11 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
         if (homeOpt.isEmpty()) {
             Set<String> homes = homeService.getHomeNames(playerId);
             if (homes.isEmpty()) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("homeNoHomeSet")).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeNoHomeSet"), "#FF5555"));
                 return;
             }
             ctx.sendMessage(Message.join(
-                Message.raw(configManager.getMessage("homeNotFound", "name", homeName)).color("#FF5555"),
+                MessageFormatter.formatWithFallback(configManager.getMessage("homeNotFound", "name", homeName), "#FF5555"),
                 Message.raw(" Your homes: ").color("#FF5555"),
                 Message.raw(String.join(", ", homes)).color("#FFFFFF")
             ));
@@ -112,7 +113,7 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
         // Get current position for warmup and /back
         TransformComponent transform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
         
@@ -146,7 +147,7 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
-                ctx.sendMessage(Message.raw(configManager.getMessage("homeTeleported", "name", finalHomeName)).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeTeleported", "name", finalHomeName), "#55FF55"));
             });
         };
 
@@ -154,7 +155,7 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
         int warmupSeconds = CommandPermissionUtil.getEffectiveWarmup(playerId, COMMAND_NAME, config.homes.warmupSeconds);
         
         if (warmupSeconds > 0) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("homeWarmup", "name", finalHomeName, "seconds", String.valueOf(warmupSeconds))).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeWarmup", "name", finalHomeName, "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
         }
         warmupService.startWarmup(player, currentPos, warmupSeconds, doTeleport, COMMAND_NAME, world, store, ref);
     }

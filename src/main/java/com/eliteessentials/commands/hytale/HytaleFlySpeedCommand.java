@@ -4,6 +4,7 @@ import com.eliteessentials.commands.args.SimpleStringArg;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -67,13 +68,13 @@ public class HytaleFlySpeedCommand extends AbstractPlayerCommand {
             try {
                 speed = Float.parseFloat(speedStr);
             } catch (NumberFormatException e) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedInvalid")).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flySpeedInvalid"), "#FF5555"));
                 return;
             }
 
             // Validate speed range (10 to 100)
             if (speed < 10.0f || speed > 100.0f) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedOutOfRange")).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flySpeedOutOfRange"), "#FF5555"));
                 return;
             }
         }
@@ -81,7 +82,7 @@ public class HytaleFlySpeedCommand extends AbstractPlayerCommand {
         // Get movement manager
         MovementManager movementManager = store.getComponent(ref, MovementManager.getComponentType());
         if (movementManager == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("flyFailed")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flyFailed"), "#FF5555"));
             return;
         }
 
@@ -100,24 +101,24 @@ public class HytaleFlySpeedCommand extends AbstractPlayerCommand {
                 verticalField.setFloat(settings, 10.0f);
                 movementManager.update(player.getPacketHandler());
                 
-                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedReset")).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flySpeedReset"), "#55FF55"));
                 if (configManager.isDebugEnabled()) {
-                    ctx.sendMessage(Message.raw("Speed reset to default: 10.0").color("#AAAAAA"));
+                    ctx.sendMessage(MessageFormatter.formatWithFallback("Speed reset to default: 10.0", "#AAAAAA"));
                 }
             } else {
                 horizontalField.setFloat(settings, speed);
                 verticalField.setFloat(settings, speed);
                 movementManager.update(player.getPacketHandler());
                 
-                ctx.sendMessage(Message.raw(configManager.getMessage("flySpeedSet", "speed", String.format("%.1f", speed))).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flySpeedSet", "speed", String.format("%.1f", speed)), "#55FF55"));
             }
         } catch (NoSuchFieldException e) {
-            ctx.sendMessage(Message.raw("Fly speed control is not available in the current Hytale API.").color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback("Fly speed control is not available in the current Hytale API.", "#FFAA00"));
             if (configManager.isDebugEnabled()) {
-                ctx.sendMessage(Message.raw("Error: " + e.getMessage()).color("#AAAAAA"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback("Error: " + e.getMessage(), "#AAAAAA"));
             }
         } catch (Exception e) {
-            ctx.sendMessage(Message.raw("Error setting fly speed: " + e.getMessage()).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback("Error setting fly speed: " + e.getMessage(), "#FF5555"));
             if (configManager.isDebugEnabled()) {
                 e.printStackTrace();
             }

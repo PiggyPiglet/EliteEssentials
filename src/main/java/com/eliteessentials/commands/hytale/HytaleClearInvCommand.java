@@ -3,6 +3,7 @@ package com.eliteessentials.commands.hytale;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -61,14 +62,14 @@ public class HytaleClearInvCommand extends AbstractPlayerCommand {
         // Get player component
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("clearInvFailed")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("clearInvFailed"), "#FF5555"));
             return;
         }
         
         // Get inventory
         Inventory inventory = player.getInventory();
         if (inventory == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("clearInvFailed")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("clearInvFailed"), "#FF5555"));
             return;
         }
         
@@ -110,7 +111,7 @@ public class HytaleClearInvCommand extends AbstractPlayerCommand {
         
         // Send success message
         String message = configManager.getMessage("clearInvSuccess", "count", String.valueOf(totalCleared));
-        ctx.sendMessage(Message.raw(message).color("#55FF55"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(message, "#55FF55"));
         
         if (configManager.isDebugEnabled()) {
             logger.info("Cleared " + totalCleared + " items from " + 

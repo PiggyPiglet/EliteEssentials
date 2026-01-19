@@ -8,6 +8,7 @@ import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.RtpService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -90,7 +91,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         
         // Check if player already has a warmup in progress
         if (warmupService.hasActiveWarmup(playerId)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("teleportInProgress")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("teleportInProgress"), "#FF5555"));
             return;
         }
         
@@ -98,7 +99,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         if (!CommandPermissionUtil.canBypassCooldown(playerId, COMMAND_NAME)) {
             int cooldownRemaining = rtpService.getCooldownRemaining(playerId);
             if (cooldownRemaining > 0) {
-                ctx.sendMessage(Message.raw(configManager.getMessage("onCooldown", "seconds", String.valueOf(cooldownRemaining))).color("#FF5555"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("onCooldown", "seconds", String.valueOf(cooldownRemaining)), "#FF5555"));
                 return;
             }
         }
@@ -106,7 +107,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         // Get player's current position for /back
         TransformComponent transform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("rtpCouldNotDeterminePosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("rtpCouldNotDeterminePosition"), "#FF5555"));
             return;
         }
         
@@ -135,7 +136,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         
         // If warmup is configured, do warmup FIRST, then find location
         if (warmupSeconds > 0) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("rtpPreparing", "seconds", String.valueOf(warmupSeconds))).color("#FFAA00"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("rtpPreparing", "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
             
             // Create action that runs AFTER warmup completes
             Runnable afterWarmup = () -> {
@@ -147,7 +148,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             warmupService.startWarmup(player, currentPos, warmupSeconds, afterWarmup, COMMAND_NAME, world, store, ref);
         } else {
             // No warmup, search and teleport immediately
-            ctx.sendMessage(Message.raw("Searching for a safe location...").color("#AAAAAA"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback("Searching for a safe location...", "#AAAAAA"));
             findAndTeleport(ctx, store, ref, player, world, playerId, centerX, centerZ, currentLoc, rtpConfig);
         }
     }
@@ -170,7 +171,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         boolean debug = configManager.isDebugEnabled();
         
         if (attempt >= maxAttempts) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("rtpFailed", "attempts", String.valueOf(maxAttempts))).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("rtpFailed", "attempts", String.valueOf(maxAttempts)), "#FF5555"));
             if (debug) {
                 logger.info("[RTP] Failed after " + maxAttempts + " attempts - no safe location found");
             }
@@ -260,7 +261,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             if (debug) {
                 logger.info("[RTP] No solid ground found at (" + blockX + ", " + blockZ + "), trying next location");
             }
-            ctx.sendMessage(Message.raw(configManager.getMessage("rtpSearching")).color("#AAAAAA"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("rtpSearching"), "#AAAAAA"));
             tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, 
                            currentLoc, rtpConfig, attempt + 1);
             return;
@@ -285,7 +286,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             if (debug) {
                 logger.info("[RTP] Location rejected - unsafe (water/lava detected)");
             }
-            ctx.sendMessage(Message.raw(configManager.getMessage("rtpSearching")).color("#AAAAAA"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("rtpSearching"), "#AAAAAA"));
             
             // Try next location
             tryNextLocation(ctx, store, ref, player, world, playerId, centerX, centerZ, 
@@ -651,7 +652,7 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
         }
         
         String location = String.format("%.0f, %.0f, %.0f", teleportX, teleportY, teleportZ);
-        ctx.sendMessage(Message.raw(configManager.getMessage("rtpTeleported", "location", location)).color("#55FF55"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("rtpTeleported", "location", location), "#55FF55"));
         
         rtpService.setCooldown(playerId);
         

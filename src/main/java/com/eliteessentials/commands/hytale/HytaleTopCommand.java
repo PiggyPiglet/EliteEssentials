@@ -5,6 +5,7 @@ import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.BackService;
 import com.eliteessentials.model.Location;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -64,7 +65,7 @@ public class HytaleTopCommand extends AbstractPlayerCommand {
         // Get player's current position
         TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
 
@@ -76,14 +77,14 @@ public class HytaleTopCommand extends AbstractPlayerCommand {
         long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
         WorldChunk chunk = world.getChunk(chunkIndex);
         if (chunk == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("topChunkNotLoaded")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("topChunkNotLoaded"), "#FF5555"));
             return;
         }
 
         // Find highest solid block from top down
         Integer topY = findHighestSolidBlock(chunk, blockX, blockZ);
         if (topY == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("topNoGround")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("topNoGround"), "#FF5555"));
             return;
         }
 
@@ -111,7 +112,7 @@ public class HytaleTopCommand extends AbstractPlayerCommand {
         Teleport teleport = new Teleport(world, targetPos, targetRotation);
         store.putComponent(ref, Teleport.getComponentType(), teleport);
 
-        ctx.sendMessage(Message.raw(configManager.getMessage("topTeleported")).color("#55FF55"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("topTeleported"), "#55FF55"));
     }
 
     /**

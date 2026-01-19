@@ -10,6 +10,7 @@ import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.TpaService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.util.CommandPermissionUtil;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -73,7 +74,7 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         List<TpaRequest> pendingRequests = tpaService.getPendingRequests(playerId);
         
         if (pendingRequests.isEmpty()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaNoPending")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaNoPending"), "#FF5555"));
             return;
         }
 
@@ -81,7 +82,7 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         TpaRequest request = pendingRequests.get(pendingRequests.size() - 1);
         
         if (request.isExpired()) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaExpired")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaExpired"), "#FF5555"));
             return;
         }
 
@@ -91,7 +92,7 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         if (requester == null || !requester.isValid()) {
             // Remove the invalid request so player can accept other requests
             tpaService.denyRequestFrom(playerId, request.getRequesterId());
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaPlayerOffline", "player", request.getRequesterName())).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaPlayerOffline", "player", request.getRequesterName()), "#FF5555"));
             return;
         }
         
@@ -101,14 +102,14 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         if (requesterRef == null || !requesterRef.isValid()) {
             // Remove the invalid request
             tpaService.denyRequestFrom(playerId, request.getRequesterId());
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotFindRequester")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaCouldNotFindRequester"), "#FF5555"));
             return;
         }
         
         Store<EntityStore> requesterStore = requesterRef.getStore();
         if (requesterStore == null) {
             tpaService.denyRequestFrom(playerId, request.getRequesterId());
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotFindRequester")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaCouldNotFindRequester"), "#FF5555"));
             return;
         }
         
@@ -117,7 +118,7 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         if (requesterTransform == null) {
             // Remove the invalid request
             tpaService.denyRequestFrom(playerId, request.getRequesterId());
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaCouldNotGetRequesterPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaCouldNotGetRequesterPosition"), "#FF5555"));
             return;
         }
         
@@ -129,7 +130,7 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         // Get target (acceptor's) position
         TransformComponent targetTransform = (TransformComponent) store.getComponent(ref, TransformComponent.getComponentType());
         if (targetTransform == null) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("couldNotGetPosition")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
             return;
         }
         
@@ -165,7 +166,7 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
                 requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
                 logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
                 
-                requester.sendMessage(Message.raw(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername())).color("#55FF55"));
+                requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername()), "#55FF55"));
             } else {
                 // TPAHERE: Target (acceptor) teleports to requester
                 HeadRotation targetHeadRot = (HeadRotation) store.getComponent(ref, HeadRotation.getComponentType());
@@ -186,8 +187,8 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 logger.fine("[TPAHERE] Teleport component added for " + player.getUsername());
                 
-                ctx.sendMessage(Message.raw(configManager.getMessage("tpahereAcceptedTarget", "player", request.getRequesterName())).color("#55FF55"));
-                requester.sendMessage(Message.raw(configManager.getMessage("tpahereAcceptedRequester", "player", player.getUsername())).color("#55FF55"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpahereAcceptedTarget", "player", request.getRequesterName()), "#55FF55"));
+                requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpahereAcceptedRequester", "player", player.getUsername()), "#55FF55"));
             }
         };
 
@@ -197,14 +198,14 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         
         // Check if requester already has a warmup
         if (warmupService.hasActiveWarmup(request.getRequesterId())) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("tpaRequesterInProgress")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaRequesterInProgress"), "#FF5555"));
             return;
         }
         
-        ctx.sendMessage(Message.raw(configManager.getMessage("tpaAccepted", "player", request.getRequesterName())).color("#55FF55"));
+        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaAccepted", "player", request.getRequesterName()), "#55FF55"));
         
         if (warmupSeconds > 0) {
-            requester.sendMessage(Message.raw(configManager.getMessage("tpaRequesterWarmup", "player", player.getUsername(), "seconds", String.valueOf(warmupSeconds))).color("#FFAA00"));
+            requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaRequesterWarmup", "player", player.getUsername(), "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
         }
         
         warmupService.startWarmup(requester, requesterPos, warmupSeconds, doTeleport, "tpa", 

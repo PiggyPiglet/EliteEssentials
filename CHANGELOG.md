@@ -2,6 +2,75 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.0.7] - 2026-01-18
+
+### Added
+
+- **LuckPerms Setup Guide**: Comprehensive wiki page with ready-to-use commands for setting up permissions
+  - Quick setup commands for default and admin groups
+  - Example configurations for VIP, Moderator, and Builder groups
+  - Complete permission reference organized by category
+  - Added to wiki sidebar under Reference section
+- **Admin Teleport Command**: `/tphere <player>` instantly teleports a player to your location
+  - Admin-only command with no warmup or cooldown
+  - Saves target player's location for `/back`
+  - Permission: `eliteessentials.command.tp.tphere` (Admin only)
+- **List Command**: `/list` (aliases: `/online`) shows all online players
+  - Displays player count and sorted list of player names
+  - Permission: `eliteessentials.command.misc.list` (Everyone)
+- **Color Code Support in Messages**: Added `MessageFormatter.formatWithFallback()` utility method
+  - Config messages now support color codes using `&` prefix (e.g., `&c` for red, `&a` for green)
+  - Updated ALL 40+ command files to support color codes in config messages
+  - Updated service files (WarmupService, SleepService) to support color codes
+  - Updated GUI files (KitSelectionPage) to support color codes
+  - Users can now customize message colors in config.json (e.g., `"msgSent": "&d[To {player}] {message}"`)
+  - Falls back to default color if no color codes are present
+  - Supports multiple colors in a single message
+  - No breaking changes for existing configs
+
+### Fixed
+
+- **Broadcast command**: Now properly accepts all text after the command including spaces
+  - Changed from single-word argument to greedy string parsing
+  - Supports color codes using `&` prefix (e.g., `&c` for red, `&a` for green)
+  - Works with `/bc` alias
+  - Example: `/broadcast &l&6Server restart in 5 minutes!`
+- **Rules command spacing**: Fixed excessive spacing between rule lines
+  - Empty lines in rules.json are now skipped to prevent double spacing
+  - Same fix as applied to MOTD command
+- **Chat formatting with LuckPerms**: Fixed chat formatting not working when LuckPerms is enabled
+  - Changed approach to cancel chat event and manually broadcast formatted messages
+  - Fixed LuckPerms group retrieval by parsing user nodes (group.groupname format)
+  - Added debug logging to help diagnose issues
+  - **Important:** EliteEssentials chat formatting now overrides LuckPerms chat formatting. If you want to use LuckPerms prefixes/suffixes instead, disable chat formatting in config by setting `chatFormat.enabled: false`
+- **MOTD spacing**: Fixed excessive spacing between MOTD lines
+  - Empty strings in config no longer create double spacing
+  - Applied to both join message display and `/motd` command
+- **Join message color codes**: Fixed literal color codes displaying in join messages
+  - Now uses MessageFormatter to properly process all `&` color codes
+  - Example: `&l&f[&r&l&2+&r&l&f]` now displays with proper formatting
+- **Instance world protection**: Players can no longer set homes or warps in temporary instance worlds
+  - Blocks `/sethome` and `/setwarp` in worlds with "instance-" prefix
+  - Prevents homes/warps in temporary worlds that close after dungeons/portals
+  - Added error messages: "cannotSetHomeInInstance" and "cannotSetWarpInInstance"
+- **Respawn at custom spawn**: Players now respawn at `/setspawn` location after death
+  - Uses Hytale's native spawn provider system
+  - `/setspawn` now sets the world's spawn provider directly
+
+### Changed
+
+- **Config merge system**: No longer overwrites user's custom group formats in chat formatting
+  - Preserves exact user values instead of merging map contents
+  - Users can now safely customize group names and formats
+
+### Technical Improvements
+
+- Chat formatting uses event cancellation approach to override LuckPerms
+- Spawn system uses `world.getWorldConfig().setSpawnProvider()` for respawn handling
+- Broadcast command uses `setAllowsExtraArguments(true)` for full message capture
+- Updated steering documentation to note Unicode symbols are not supported in Hytale chat
+- Added `MessageFormatter.formatWithFallback()` for easier color code support in commands
+
 ## [1.0.6] - 2026-01-18
 
 ### Added
@@ -15,7 +84,7 @@ All notable changes to EliteEssentials will be documented in this file.
   - Default formats for Owner, Admin, Moderator, OP, VIP, Player, and Default groups
   - Easy to add custom groups - just add to `groupFormats` and `groupPriorities`
   - Can be enabled/disabled via config
-- **MOTD System Overhaul**: Professional Message of the Day with rich formatting
+- **MOTD System**: Professional Message of the Day with rich formatting
   - `/motd` command displays customizable welcome message
   - Stored in separate `motd.json` file for easy editing
   - Color code support (`&a`, `&b`, `&c`, `&l`, `&o`, `&r`)
