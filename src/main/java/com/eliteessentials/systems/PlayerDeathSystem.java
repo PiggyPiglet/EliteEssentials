@@ -194,15 +194,24 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
             if (deathMessage != null) {
                 String ansiMessage = deathMessage.getAnsiMessage();
                 if (ansiMessage != null && !ansiMessage.isEmpty()) {
-                    // The message is like "You were killed by Skeleton Fighter!"
-                    // Convert to third person: "PlayerName was killed by Skeleton Fighter!"
-                    String thirdPerson = ansiMessage
-                        .replace("You were", playerName + " was")
-                        .replace("You ", playerName + " ");
-                    if (configManager.isDebugEnabled()) {
-                        logger.info("[PlayerDeathSystem] Using death message: " + thirdPerson);
+                    // Check if the message contains unresolved StringParamValue objects
+                    // These show up as "StringParamValue@" in the raw output
+                    if (ansiMessage.contains("StringParamValue@") || ansiMessage.contains("ParamValue@")) {
+                        if (configManager.isDebugEnabled()) {
+                            logger.info("[PlayerDeathSystem] Skipping unresolved death message: " + ansiMessage);
+                        }
+                        // Fall through to other methods
+                    } else {
+                        // The message is like "You were killed by Skeleton Fighter!"
+                        // Convert to third person: "PlayerName was killed by Skeleton Fighter!"
+                        String thirdPerson = ansiMessage
+                            .replace("You were", playerName + " was")
+                            .replace("You ", playerName + " ");
+                        if (configManager.isDebugEnabled()) {
+                            logger.info("[PlayerDeathSystem] Using death message: " + thirdPerson);
+                        }
+                        return thirdPerson;
                     }
-                    return thirdPerson;
                 }
             }
         } catch (Exception e) {
