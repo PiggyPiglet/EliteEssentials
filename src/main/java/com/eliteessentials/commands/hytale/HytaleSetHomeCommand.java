@@ -69,8 +69,9 @@ public class HytaleSetHomeCommand extends AbstractPlayerCommand {
     
     static void setHome(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
                         PlayerRef player, World world, String homeName, HomeService homeService) {
-        boolean enabled = EliteEssentials.getInstance().getConfigManager().getConfig().homes.enabled;
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.SETHOME, enabled)) {
+        var config = EliteEssentials.getInstance().getConfigManager().getConfig();
+        if (!CommandPermissionUtil.canExecuteWithCost(ctx, player, Permissions.SETHOME, 
+                config.homes.enabled, "sethome", config.homes.setHomeCost)) {
             return;
         }
         

@@ -75,11 +75,18 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
         goHome(ctx, store, ref, player, world, "home", homeService, backService);
     }
 
-    static void goHome(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
+    public static void goHome(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
                        PlayerRef player, World world, String homeName,
                        HomeService homeService, BackService backService) {
+        goHome(ctx, store, ref, player, world, homeName, homeService, backService, false);
+    }
+    
+    public static void goHome(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref,
+                       PlayerRef player, World world, String homeName,
+                       HomeService homeService, BackService backService, boolean silent) {
         PluginConfig config = EliteEssentials.getInstance().getConfigManager().getConfig();
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.HOME, config.homes.enabled)) {
+        if (!CommandPermissionUtil.canExecuteWithCost(ctx, player, Permissions.HOME, 
+                config.homes.enabled, "home", config.homes.cost)) {
             return;
         }
         
@@ -136,6 +143,7 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
         }
         final World finalWorld = targetWorld;
         final String finalHomeName = homeName;
+        final boolean finalSilent = silent;
 
         // Define the teleport action
         Runnable doTeleport = () -> {
@@ -149,17 +157,20 @@ public class HytaleHomeCommand extends AbstractPlayerCommand {
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
-                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeTeleported", "name", finalHomeName), "#55FF55"));
+                if (!finalSilent) {
+                    ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeTeleported", "name", finalHomeName), "#55FF55"));
+                }
             });
         };
 
         // Get effective warmup (check bypass permission)
         int warmupSeconds = CommandPermissionUtil.getEffectiveWarmup(playerId, COMMAND_NAME, config.homes.warmupSeconds);
         
-        if (warmupSeconds > 0) {
+        if (warmupSeconds > 0 && !silent) {
             ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeWarmup", "name", finalHomeName, "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
         }
-        warmupService.startWarmup(player, currentPos, warmupSeconds, doTeleport, COMMAND_NAME, world, store, ref);
+        // Pass false for warmup silent - we want countdown messages to show
+        warmupService.startWarmup(player, currentPos, warmupSeconds, doTeleport, COMMAND_NAME, world, store, ref, false);
     }
     
     /**

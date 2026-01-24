@@ -18,17 +18,23 @@ public class Warp {
     private Permission permission;
     private String createdBy;
     private long createdAt;
+    private String description;
 
     public Warp() {
         // For Gson deserialization
     }
 
     public Warp(String name, Location location, Permission permission, String createdBy) {
+        this(name, location, permission, createdBy, "");
+    }
+
+    public Warp(String name, Location location, Permission permission, String createdBy, String description) {
         this.name = name;
         this.location = location;
         this.permission = permission;
         this.createdBy = createdBy;
         this.createdAt = Instant.now().toEpochMilli();
+        this.description = description != null ? description : "";
     }
 
     public String getName() {
@@ -73,6 +79,14 @@ public class Warp {
 
     public boolean isOpOnly() {
         return permission == Permission.OP;
+    }
+
+    public String getDescription() {
+        return description != null ? description : "";
+    }
+
+    public void setDescription(String description) {
+        this.description = description != null ? description : "";
     }
 
     @Override

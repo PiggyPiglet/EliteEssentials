@@ -2,12 +2,16 @@ package com.eliteessentials.listeners;
 
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.config.PluginConfig;
+import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.storage.MotdStorage;
 import com.eliteessentials.util.MessageFormatter;
+import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.event.EventRegistry;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
+import com.hypixel.hytale.server.core.event.events.player.DrainPlayerFromWorldEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -22,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,11 +37,15 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 /**
- * Handles player join messages.
- * - Join messages
+ * Handles player join/quit events.
+ * - Join messages (server join only, not world changes)
  * - First join messages (broadcast to everyone)
- * - MOTD display on join
- * - Suppression of default Hytale join messages
+ * - Quit messages (server disconnect only, not world changes)
+ * - World change messages (optional)
+ * - MOTD display on join (server join only, not world changes)
+ * - Per-world MOTD (optional, can show always or once per session)
+ * - Suppression of default Hytale join/leave messages
+ * - Player cache updates (via PlayerService)
  */
 public class JoinQuitListener {
     
@@ -45,14 +54,25 @@ public class JoinQuitListener {
     
     private final ConfigManager configManager;
     private final MotdStorage motdStorage;
+    private final PlayerService playerService;
     private final File firstJoinFile;
     private final Set<UUID> firstJoinPlayers;
     private final Object fileLock = new Object();
     private final ScheduledExecutorService scheduler;
     
-    public JoinQuitListener(ConfigManager configManager, MotdStorage motdStorage, File dataFolder) {
+    // Track players currently on the server to differentiate world changes from joins/quits
+    private final Set<UUID> onlinePlayers = ConcurrentHashMap.newKeySet();
+    // Track players who are changing worlds (drain then add in quick succession)
+    private final Set<UUID> worldChangingPlayers = ConcurrentHashMap.newKeySet();
+    // Track which worlds each player has seen MOTD for this session (for showAlways=false)
+    private final ConcurrentHashMap<UUID, Set<String>> seenWorldMotds = new ConcurrentHashMap<>();
+    // Track the last world each player was in (to detect world changes when DrainEvent doesn't fire)
+    private final ConcurrentHashMap<UUID, String> playerLastWorld = new ConcurrentHashMap<>();
+    
+    public JoinQuitListener(ConfigManager configManager, MotdStorage motdStorage, PlayerService playerService, File dataFolder) {
         this.configManager = configManager;
         this.motdStorage = motdStorage;
+        this.playerService = playerService;
         this.firstJoinFile = new File(dataFolder, "first_join.json");
         this.firstJoinPlayers = new HashSet<>();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -69,23 +89,122 @@ public class JoinQuitListener {
     public void registerEvents(EventRegistry eventRegistry) {
         PluginConfig config = configManager.getConfig();
         
-        // Use PlayerReadyEvent for join - fires when player is fully loaded
+        // Use PlayerReadyEvent for initial server join - fires when player is fully loaded
         eventRegistry.registerGlobal(PlayerReadyEvent.class, event -> {
             onPlayerJoin(event);
         });
         
-        // Suppress default join messages if configured
+        // Register quit event for player cache and quit messages
+        eventRegistry.registerGlobal(PlayerDisconnectEvent.class, event -> {
+            onPlayerQuit(event);
+        });
+        
+        // Handle world changes - DrainPlayerFromWorldEvent fires when leaving a world
+        eventRegistry.registerGlobal(DrainPlayerFromWorldEvent.class, event -> {
+            onPlayerDrainFromWorld(event);
+        });
+        
+        // Suppress default join messages and handle world change joins
         // Uses AddPlayerToWorldEvent.setBroadcastJoinMessage(false) to prevent
         // the built-in "player has joined default" message
-        if (config.joinMsg.suppressDefaultMessages) {
-            eventRegistry.registerGlobal(AddPlayerToWorldEvent.class, event -> {
-                event.setBroadcastJoinMessage(false);
-            });
+        eventRegistry.registerGlobal(AddPlayerToWorldEvent.class, event -> {
+            onPlayerAddToWorld(event);
+        });
+    }
+    
+    /**
+     * Handle player being drained from a world (leaving world).
+     * This fires for both world changes AND disconnects.
+     * We mark the player as "world changing" - if they don't disconnect shortly after,
+     * they're just changing worlds.
+     */
+    private void onPlayerDrainFromWorld(DrainPlayerFromWorldEvent event) {
+        Holder<EntityStore> holder = event.getHolder();
+        if (holder == null) {
+            return;
+        }
+        
+        PlayerRef playerRef = holder.getComponent(PlayerRef.getComponentType());
+        if (playerRef == null) {
+            return;
+        }
+        
+        UUID playerId = playerRef.getUuid();
+        String playerName = playerRef.getUsername();
+        String worldName = event.getWorld() != null ? event.getWorld().getName() : "unknown";
+        
+        // Mark as potentially changing worlds
+        worldChangingPlayers.add(playerId);
+        
+        // Broadcast world leave message if enabled
+        PluginConfig config = configManager.getConfig();
+        if (config.joinMsg.worldChangeEnabled && onlinePlayers.contains(playerId)) {
+            String message = configManager.getMessage("worldLeaveMessage", "player", playerName, "world", worldName);
+            if (message != null && !message.isEmpty()) {
+                broadcastMessage(message, "#AAAAAA");
+            }
         }
     }
     
     /**
-     * Handle player join event.
+     * Handle player being added to a world.
+     * This fires for both initial joins AND world changes.
+     */
+    private void onPlayerAddToWorld(AddPlayerToWorldEvent event) {
+        PluginConfig config = configManager.getConfig();
+        
+        // Always suppress default Hytale join messages if configured
+        if (config.joinMsg.suppressDefaultMessages) {
+            event.setBroadcastJoinMessage(false);
+        }
+        
+        Holder<EntityStore> holder = event.getHolder();
+        if (holder == null) {
+            return;
+        }
+        
+        PlayerRef playerRef = holder.getComponent(PlayerRef.getComponentType());
+        if (playerRef == null) {
+            return;
+        }
+        
+        UUID playerId = playerRef.getUuid();
+        String playerName = playerRef.getUsername();
+        String worldName = event.getWorld() != null ? event.getWorld().getName() : "unknown";
+        
+        // Check if this is a world change using multiple methods:
+        // 1. DrainPlayerFromWorldEvent set the flag (preferred)
+        // 2. Player is online and entering a different world than they were in
+        boolean isWorldChange = worldChangingPlayers.remove(playerId);
+        
+        // Fallback: If drain event didn't fire, check if player is online and world changed
+        if (!isWorldChange && onlinePlayers.contains(playerId)) {
+            String lastWorld = playerLastWorld.get(playerId);
+            if (lastWorld != null && !lastWorld.equalsIgnoreCase(worldName)) {
+                isWorldChange = true;
+            }
+        }
+        
+        // Update last world tracking
+        playerLastWorld.put(playerId, worldName);
+        
+        // If player was draining (world change), show world MOTD and broadcast
+        if (isWorldChange) {
+            // Broadcast world join message if enabled
+            if (config.joinMsg.worldChangeEnabled) {
+                String message = configManager.getMessage("worldJoinMessage", "player", playerName, "world", worldName);
+                if (message != null && !message.isEmpty()) {
+                    broadcastMessage(message, "#AAAAAA");
+                }
+            }
+            
+            // Show world-specific MOTD if configured
+            showWorldMotd(playerRef, worldName);
+        }
+    }
+    
+    /**
+     * Handle player join event (initial server join).
      * Uses world.execute() to ensure thread safety when accessing store components.
      */
     private void onPlayerJoin(PlayerReadyEvent event) {
@@ -113,7 +232,25 @@ public class JoinQuitListener {
             
             UUID playerId = playerRef.getUuid();
             String playerName = playerRef.getUsername();
+            String worldName = world.getName();
             PluginConfig config = configManager.getConfig();
+            
+            // Check if already online (prevents duplicate join messages on world change)
+            if (onlinePlayers.contains(playerId)) {
+                return;
+            }
+            
+            // Track as online - this is a real server join
+            onlinePlayers.add(playerId);
+            // Clear any world change flag
+            worldChangingPlayers.remove(playerId);
+            // Clear seen world MOTDs for new session
+            seenWorldMotds.remove(playerId);
+            // Set initial world for world change detection
+            playerLastWorld.put(playerId, worldName);
+            
+            // Update player cache
+            playerService.onPlayerJoin(playerId, playerName);
             
             // Check if first join
             boolean isFirstJoin = !firstJoinPlayers.contains(playerId);
@@ -136,25 +273,59 @@ public class JoinQuitListener {
                 }
             }
             
-            // Show MOTD
+            // Show global MOTD (only on server join, not world changes)
             if (config.motd.enabled && config.motd.showOnJoin) {
-                String worldName = world.getName();
                 int delay = config.motd.delaySeconds;
                 if (delay > 0) {
                     // Schedule MOTD display after delay
-                    scheduleMotd(playerRef, delay, worldName);
+                    scheduleGlobalMotd(playerRef, delay, worldName);
                 } else {
                     // Show immediately
-                    showMotd(playerRef, worldName);
+                    showGlobalMotd(playerRef, worldName);
                 }
             }
+            
+            // Also show world-specific MOTD for the initial world
+            showWorldMotd(playerRef, worldName);
         });
     }
     
     /**
-     * Show MOTD to player.
+     * Handle player quit event (actual server disconnect).
+     * Updates player cache with last seen time and play time.
      */
-    private void showMotd(PlayerRef playerRef, String worldName) {
+    private void onPlayerQuit(PlayerDisconnectEvent event) {
+        PlayerRef playerRef = event.getPlayerRef();
+        if (playerRef == null) {
+            return;
+        }
+        
+        UUID playerId = playerRef.getUuid();
+        String playerName = playerRef.getUsername();
+        
+        // Remove from online tracking
+        onlinePlayers.remove(playerId);
+        worldChangingPlayers.remove(playerId);
+        // Clear seen world MOTDs when player disconnects
+        seenWorldMotds.remove(playerId);
+        // Clear last world tracking
+        playerLastWorld.remove(playerId);
+        
+        // Update player cache (last seen, play time)
+        playerService.onPlayerQuit(playerId);
+        
+        // Broadcast quit message if enabled
+        PluginConfig config = configManager.getConfig();
+        if (config.joinMsg.quitEnabled) {
+            String message = configManager.getMessage("quitMessage", "player", playerName);
+            broadcastMessage(message, "#FF5555");
+        }
+    }
+    
+    /**
+     * Show global MOTD to player (server join MOTD).
+     */
+    private void showGlobalMotd(PlayerRef playerRef, String worldName) {
         PluginConfig config = configManager.getConfig();
         
         // Get MOTD lines
@@ -186,10 +357,56 @@ public class JoinQuitListener {
     }
     
     /**
-     * Schedule MOTD display after delay using executor service for proper thread management.
+     * Show world-specific MOTD to player.
+     * Respects showAlways setting - if false, only shows once per session.
      */
-    private void scheduleMotd(PlayerRef playerRef, int delaySeconds, String worldName) {
-        scheduler.schedule(() -> showMotd(playerRef, worldName), delaySeconds, TimeUnit.SECONDS);
+    private void showWorldMotd(PlayerRef playerRef, String worldName) {
+        if (playerRef == null || worldName == null) return;
+        
+        // Check if world has a configured MOTD
+        MotdStorage.WorldMotd worldMotd = motdStorage.getWorldMotd(worldName);
+        if (worldMotd == null || !worldMotd.enabled || worldMotd.lines == null || worldMotd.lines.isEmpty()) {
+            return;
+        }
+        
+        UUID playerId = playerRef.getUuid();
+        
+        // Check if we should show this MOTD
+        if (!worldMotd.showAlways) {
+            // Only show once per session - check if player has already seen it
+            Set<String> seenWorlds = seenWorldMotds.computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet());
+            if (seenWorlds.contains(worldName.toLowerCase())) {
+                return; // Already seen this world's MOTD this session
+            }
+            seenWorlds.add(worldName.toLowerCase());
+        }
+        
+        // Replace placeholders and send
+        PluginConfig config = configManager.getConfig();
+        String playerName = playerRef.getUsername();
+        String serverName = config.motd.serverName;
+        int playerCount = Universe.get().getPlayers().size();
+        
+        for (String line : worldMotd.lines) {
+            if (line.trim().isEmpty()) {
+                continue;
+            }
+            
+            String processedLine = line
+                    .replace("{player}", playerName)
+                    .replace("{server}", serverName)
+                    .replace("{world}", worldName)
+                    .replace("{playercount}", String.valueOf(playerCount));
+            
+            playerRef.sendMessage(MessageFormatter.format(processedLine));
+        }
+    }
+    
+    /**
+     * Schedule global MOTD display after delay.
+     */
+    private void scheduleGlobalMotd(PlayerRef playerRef, int delaySeconds, String worldName) {
+        scheduler.schedule(() -> showGlobalMotd(playerRef, worldName), delaySeconds, TimeUnit.SECONDS);
     }
     
     /**

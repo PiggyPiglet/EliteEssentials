@@ -54,7 +54,8 @@ public class HytaleTpahereCommand extends AbstractPlayerCommand {
                           @Nonnull PlayerRef player, @Nonnull World world) {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
         PluginConfig config = configManager.getConfig();
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.TPAHERE, config.tpa.enabled)) {
+        if (!CommandPermissionUtil.canExecuteWithCost(ctx, player, Permissions.TPAHERE, 
+                config.tpa.enabled, "tpahere", config.tpa.tpahereCost)) {
             return;
         }
         

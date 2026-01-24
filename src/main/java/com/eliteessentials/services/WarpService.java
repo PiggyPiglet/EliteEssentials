@@ -55,14 +55,37 @@ public class WarpService {
      * @return error message if failed, null if successful
      */
     public String setWarp(String name, Location location, Warp.Permission permission, String createdBy) {
+        return setWarp(name, location, permission, createdBy, "");
+    }
+
+    /**
+     * Create or update a warp with description.
+     * @return error message if failed, null if successful
+     */
+    public String setWarp(String name, Location location, Warp.Permission permission, String createdBy, String description) {
         String validationError = validateWarpName(name);
         if (validationError != null) {
             return validationError;
         }
 
-        Warp warp = new Warp(name, location, permission, createdBy);
+        Warp warp = new Warp(name, location, permission, createdBy, description);
         storage.setWarp(warp);
         return null;
+    }
+
+    /**
+     * Update a warp's description.
+     * @return true if updated, false if warp not found
+     */
+    public boolean updateWarpDescription(String name, String description) {
+        Optional<Warp> warpOpt = storage.getWarp(name);
+        if (warpOpt.isEmpty()) {
+            return false;
+        }
+        Warp warp = warpOpt.get();
+        warp.setDescription(description);
+        storage.setWarp(warp);
+        return true;
     }
 
     /**

@@ -5,6 +5,7 @@ import com.eliteessentials.commands.args.SimpleStringArg;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.permissions.Permissions;
+import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
@@ -45,7 +46,7 @@ public class HytaleReloadCommand extends CommandBase {
         // Check admin permission
         PermissionService perms = PermissionService.get();
         if (!perms.canUseAdminCommand(ctx.sender(), Permissions.ADMIN_RELOAD, true)) {
-            ctx.sendMessage(Message.raw(EliteEssentials.getInstance().getConfigManager().getMessage("noPermission")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("noPermission"), "#FF5555"));
             return;
         }
         

@@ -281,6 +281,7 @@ public class LuckPermsIntegration {
         perms.add(Permissions.SLEEPPERCENT);
         perms.add(Permissions.GOD);
         perms.add(Permissions.HEAL);
+        perms.add(Permissions.HEAL_BYPASS_COOLDOWN);
         perms.add(Permissions.MSG);
         perms.add(Permissions.FLY);
         perms.add(Permissions.FLYSPEED);
@@ -291,10 +292,12 @@ public class LuckPermsIntegration {
         perms.add(Permissions.CLEARINV);
         perms.add(Permissions.LIST);
         perms.add(Permissions.DISCORD);
+        perms.add(Permissions.SEEN);
         perms.add("eliteessentials.command.misc.*");
         
         // Kit commands
         perms.add(Permissions.KIT);
+        perms.add(Permissions.KIT_GUI);
         perms.add(Permissions.KIT_CREATE);
         perms.add(Permissions.KIT_DELETE);
         perms.add(Permissions.KIT_BYPASS_COOLDOWN);
@@ -305,9 +308,31 @@ public class LuckPermsIntegration {
         // Spawn protection
         perms.add(Permissions.SPAWN_PROTECTION_BYPASS);
         
+        // Economy commands
+        perms.add(Permissions.WALLET);
+        perms.add(Permissions.WALLET_OTHERS);
+        perms.add(Permissions.WALLET_ADMIN);
+        perms.add(Permissions.PAY);
+        perms.add(Permissions.BALTOP);
+        perms.add("eliteessentials.command.economy.*");
+        
+        // Bypass permissions
+        perms.add(Permissions.BYPASS_COST);
+        perms.add(Permissions.bypassCost("home"));
+        perms.add(Permissions.bypassCost("sethome"));
+        perms.add(Permissions.bypassCost("spawn"));
+        perms.add(Permissions.bypassCost("warp"));
+        perms.add(Permissions.bypassCost("back"));
+        perms.add(Permissions.bypassCost("rtp"));
+        perms.add(Permissions.bypassCost("tpa"));
+        perms.add(Permissions.bypassCost("tpahere"));
+        perms.add("eliteessentials.bypass.*");
+        perms.add("eliteessentials.bypass.cost.*");
+        
         // Admin
         perms.add(Permissions.ADMIN);
         perms.add(Permissions.ADMIN_RELOAD);
+        perms.add(Permissions.ADMIN_ALIAS);
         
         return perms;
     }

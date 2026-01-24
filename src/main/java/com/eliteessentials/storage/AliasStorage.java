@@ -146,12 +146,25 @@ public class AliasStorage {
          * - custom string = specific permission node (e.g., "eliteessentials.alias.explore")
          */
         public String permission;
+        
+        /**
+         * If true, suppress teleport confirmation messages (e.g., "Teleported to warp 'explore'")
+         * Useful when you have world MOTDs that provide context instead.
+         */
+        public boolean silent = false;
 
         public AliasData() {}
 
         public AliasData(String command, String permission) {
             this.command = command;
             this.permission = permission;
+            this.silent = false;
+        }
+        
+        public AliasData(String command, String permission, boolean silent) {
+            this.command = command;
+            this.permission = permission;
+            this.silent = silent;
         }
     }
 }

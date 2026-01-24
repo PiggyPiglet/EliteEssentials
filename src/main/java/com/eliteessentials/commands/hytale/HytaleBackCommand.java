@@ -58,7 +58,8 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
     protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> ref, 
                           @Nonnull PlayerRef player, @Nonnull World world) {
         PluginConfig config = EliteEssentials.getInstance().getConfigManager().getConfig();
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.BACK, config.back.enabled)) {
+        if (!CommandPermissionUtil.canExecuteWithCost(ctx, player, Permissions.BACK, 
+                config.back.enabled, "back", config.back.cost)) {
             return;
         }
         

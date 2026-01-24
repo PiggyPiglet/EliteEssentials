@@ -92,8 +92,9 @@ public class HytaleRtpCommand extends AbstractPlayerCommand {
             plugin.getDeathTrackingService().trackPlayer(playerId);
         }
         
-        // Check permission and enabled state
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.RTP, rtpConfig.enabled)) {
+        // Check permission and enabled state with cost
+        if (!CommandPermissionUtil.canExecuteWithCost(ctx, player, Permissions.RTP, 
+                rtpConfig.enabled, "rtp", rtpConfig.cost)) {
             return;
         }
         

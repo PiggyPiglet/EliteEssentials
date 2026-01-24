@@ -106,6 +106,17 @@ All 60+ player-facing messages are configurable in `messages.json`. Translate yo
 - Progress messages shown to all players
 - Automatically skips to morning when threshold reached
 
+### Economy System (Disabled by Default)
+- **`/wallet`** - View your balance
+- **`/wallet <player>`** - View another player's balance (requires permission)
+- **`/wallet set/add/remove <player> <amount>`** - Admin balance management
+- **`/pay <player> <amount>`** - Send money to another player
+- **`/baltop`** - View richest players leaderboard
+- **`/eco`** - Console/admin economy management command
+- Configurable currency name, symbol, and starting balance
+- Command costs - charge players for using teleport commands
+- Full API for other mods to integrate (`com.eliteessentials.api.EconomyAPI`)
+
 ## Configuration
 
 All settings are fully configurable via `mods/EliteEssentials/config.json`:
@@ -156,6 +167,11 @@ Config file is automatically created on first server start with sensible default
 | `/delwarp <name>` | Delete warp | Admin |
 | `/warpadmin` | Warp admin panel | Admin |
 | `/sleeppercent [%]` | Set sleep percentage | Admin |
+| `/wallet` | View your balance | Everyone |
+| `/wallet <player>` | View another's balance | Everyone* |
+| `/pay <player> <amount>` | Send money to player | Everyone |
+| `/baltop` | View richest players | Everyone |
+| `/eco` | Economy admin commands | Admin |
 | `/alias` | Manage command aliases | Admin |
 | `/eliteessentials reload` | Reload configuration | Admin |
 
@@ -179,7 +195,7 @@ Full granular permissions following `eliteessentials.command.<category>.<action>
 | Warp | `command.warp.use`, `command.warp.<warpname>` |
 | Spawn | `command.spawn.use`, `command.spawn.protection.bypass` |
 | Kit | `command.kit.use`, `command.kit.<kitname>`, `command.kit.bypass.cooldown` |
-| Bypass | `command.home.bypass.cooldown`, `command.tp.bypass.warmup` |
+| Bypass | `command.home.bypass.cooldown`, `command.tp.bypass.warmup`, `bypass.cost` |
 
 See [PERMISSIONS.md](PERMISSIONS.md) for the complete permission reference.
 

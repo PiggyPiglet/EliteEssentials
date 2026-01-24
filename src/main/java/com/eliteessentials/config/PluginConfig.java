@@ -51,6 +51,7 @@ public class PluginConfig {
     public DiscordConfig discord = new DiscordConfig();
     public AutoBroadcastConfig autoBroadcast = new AutoBroadcastConfig();
     public AliasConfig aliases = new AliasConfig();
+    public EconomyConfig economy = new EconomyConfig();
     
     // ==================== MESSAGES ====================
     
@@ -146,12 +147,13 @@ public class PluginConfig {
         
         // ==================== WARP ADMIN ====================
         messages.put("warpAdminNoWarps", "&cNo warps configured.");
-        messages.put("warpAdminCreateHint", "&7Use &a/setwarp <name> [all|op] &7to create one.");
+        messages.put("warpAdminCreateHint", "&7Use &a/warpadmin create <name> [all|op] &7to create one.");
         messages.put("warpAdminTitle", "&b&l=== &fWarp Admin Panel &b&l===");
         messages.put("warpAdminTotal", "&7Total warps: &a{count}");
         messages.put("warpAdminCommands", "&eCommands:");
         messages.put("warpAdminInfoTitle", "&b&l=== &fWarp: &e{name} &b&l===");
         messages.put("warpAdminPermissionUpdated", "&aWarp &e'{name}' &apermission updated to &7{permission}&a.");
+        messages.put("warpAdminDescriptionUpdated", "&aWarp &e'{name}' &adescription updated to: &7{description}");
         
         // ==================== BACK ====================
         messages.put("backNoLocation", "&cNo previous location to go back to.");
@@ -229,6 +231,9 @@ public class PluginConfig {
         // ==================== JOIN MESSAGES ====================
         messages.put("joinMessage", "&e{player} &7joined the server.");
         messages.put("firstJoinMessage", "&e{player} &ajoined the server for the first time! Welcome!");
+        messages.put("quitMessage", "&e{player} &7left the server.");
+        messages.put("worldJoinMessage", "&7{player} entered {world}");
+        messages.put("worldLeaveMessage", "&7{player} left {world}");
         
         // ==================== BROADCAST ====================
         messages.put("broadcast", "&6&l[BROADCAST] &r&e{message}");
@@ -254,6 +259,56 @@ public class PluginConfig {
         messages.put("aliasUpdated", "&aUpdated alias &e/{name} &a-> &f/{command} &7[{permission}]");
         messages.put("aliasDeleted", "&aDeleted alias &e/{name}&a.");
         messages.put("aliasNotFound", "&cAlias &e'{name}' &cnot found.");
+        
+        // ==================== ECONOMY ====================
+        messages.put("walletBalance", "&aYour balance: &e{balance} &7{currency}");
+        messages.put("walletBalanceOther", "&a{player}'s balance: &e{balance} &7{currency}");
+        messages.put("walletAdminUsage", "&eUsage: &f/wallet <set|add|remove> <player> <amount>");
+        messages.put("walletSet", "&aSet &e{player}&a's balance to &e{balance}&a.");
+        messages.put("walletAdded", "&aAdded &e{amount} &ato &e{player}&a's wallet. New balance: &e{balance}");
+        messages.put("walletRemoved", "&aRemoved &e{amount} &afrom &e{player}&a's wallet. New balance: &e{balance}");
+        messages.put("walletInvalidAmount", "&cInvalid amount. Must be a positive number.");
+        messages.put("walletInsufficientFunds", "&c{player} doesn't have enough funds.");
+        messages.put("walletFailed", "&cFailed to update wallet.");
+        messages.put("paySent", "&aSent &e{amount} &ato &f{player}&a.");
+        messages.put("payReceived", "&aReceived &e{amount} &afrom &f{player}&a.");
+        messages.put("payInvalidAmount", "&cAmount must be greater than 0.");
+        messages.put("payMinimum", "&cMinimum payment is &e{amount}&c.");
+        messages.put("paySelf", "&cYou cannot pay yourself.");
+        messages.put("payInsufficientFunds", "&cInsufficient funds. Your balance: &e{balance}");
+        messages.put("payFailed", "&cPayment failed.");
+        messages.put("baltopHeader", "&b&l=== &fRichest Players &b&l===");
+        messages.put("baltopEntry", "&e{rank}. &f{player} &7- &a{balance}");
+        
+        // ==================== COMMAND COSTS ====================
+        messages.put("costCharged", "&7-{cost} {currency}");
+        messages.put("costInsufficientFunds", "&cInsufficient funds. Cost: &e{cost} {currency}&c, Balance: &e{balance} {currency}");
+        messages.put("costFailed", "&cFailed to process payment.");
+        messages.put("baltopYourBalance", "&7Your balance: &a{balance}");
+        messages.put("baltopEmpty", "&cNo player data found.");
+        
+        // ==================== SEEN ====================
+        messages.put("seenOnline", "&a{player} &7is currently &aonline&7.");
+        messages.put("seenLastSeen", "&f{player} &7was last seen &e{time}&7.");
+        messages.put("seenNeverJoined", "&c{player} &7has never joined this server.");
+        
+        // ==================== DEATH MESSAGES ====================
+        messages.put("deathByEntity", "{player} was killed by {killer}");
+        messages.put("deathByPlayer", "{player} was killed by {killer}");
+        messages.put("deathByFall", "{player} fell to their death");
+        messages.put("deathByFire", "{player} burned to death");
+        messages.put("deathByLava", "{player} burned to death");
+        messages.put("deathByDrowning", "{player} drowned");
+        messages.put("deathBySuffocation", "{player} suffocated");
+        messages.put("deathByVoid", "{player} fell into the void");
+        messages.put("deathByStarvation", "{player} starved to death");
+        messages.put("deathByProjectile", "{player} was shot");
+        messages.put("deathByExplosion", "{player} blew up");
+        messages.put("deathByLightning", "{player} was struck by lightning");
+        messages.put("deathByFreeze", "{player} froze to death");
+        messages.put("deathByPoison", "{player} was poisoned");
+        messages.put("deathByWither", "{player} withered away");
+        messages.put("deathGeneric", "{player} died");
     }
 
     // ==================== RTP (Random Teleport) ====================
@@ -288,6 +343,9 @@ public class PluginConfig {
         
         /** Seconds of invulnerability after RTP to prevent fall damage (0 = disabled) */
         public int invulnerabilitySeconds = 5;
+        
+        /** Cost to use this command (0 = free, requires economy enabled) */
+        public double cost = 0.0;
     }
 
     // ==================== BACK ====================
@@ -307,6 +365,9 @@ public class PluginConfig {
         
         /** Warmup in seconds - player must stand still (0 = instant) */
         public int warmupSeconds = 0;
+        
+        /** Cost to use this command (0 = free, requires economy enabled) */
+        public double cost = 0.0;
     }
 
     // ==================== TPA (Teleport Ask) ====================
@@ -320,6 +381,12 @@ public class PluginConfig {
         
         /** Warmup in seconds after accepting - requester must stand still (0 = instant) */
         public int warmupSeconds = 3;
+        
+        /** Cost to use /tpa (0 = free, requires economy enabled) */
+        public double cost = 0.0;
+        
+        /** Cost to use /tpahere (0 = free, requires economy enabled) */
+        public double tpahereCost = 0.0;
     }
 
     // ==================== HOMES ====================
@@ -339,6 +406,12 @@ public class PluginConfig {
         
         /** Warmup in seconds - player must stand still (0 = instant) */
         public int warmupSeconds = 3;
+        
+        /** Cost to teleport home (0 = free, requires economy enabled) */
+        public double cost = 0.0;
+        
+        /** Cost to set a home (0 = free, requires economy enabled) */
+        public double setHomeCost = 0.0;
     }
 
     // ==================== SPAWN ====================
@@ -365,6 +438,9 @@ public class PluginConfig {
          * Players will always teleport to this world's spawn regardless of which world they're in.
          */
         public String mainWorld = "default";
+        
+        /** Cost to use this command (0 = free, requires economy enabled) */
+        public double cost = 0.0;
     }
 
     // ==================== WARPS ====================
@@ -393,6 +469,9 @@ public class PluginConfig {
          * Example: {"Admin": -1, "VIP": 10, "Default": 3}
          */
         public Map<String, Integer> groupLimits = createDefaultWarpLimits();
+        
+        /** Cost to use /warp (0 = free, requires economy enabled) */
+        public double cost = 0.0;
         
         private static Map<String, Integer> createDefaultWarpLimits() {
             Map<String, Integer> limits = new HashMap<>();
@@ -440,6 +519,12 @@ public class PluginConfig {
     public static class HealConfig {
         /** Enable/disable the /heal command */
         public boolean enabled = true;
+        
+        /** Cooldown in seconds between uses (0 = no cooldown) */
+        public int cooldownSeconds = 0;
+        
+        /** Cost to use this command (0 = free, requires economy enabled) */
+        public double cost = 0.0;
     }
 
     // ==================== PRIVATE MESSAGING ====================
@@ -461,6 +546,9 @@ public class PluginConfig {
     public static class TopConfig {
         /** Enable/disable the /top command */
         public boolean enabled = true;
+        
+        /** Cost to use this command (0 = free, requires economy enabled) */
+        public double cost = 0.0;
     }
 
     // ==================== KITS ====================
@@ -524,6 +612,9 @@ public class PluginConfig {
         /** Enable/disable join messages */
         public boolean joinEnabled = true;
         
+        /** Enable/disable quit messages */
+        public boolean quitEnabled = true;
+        
         /** Enable/disable first join message (broadcast to everyone) */
         public boolean firstJoinEnabled = true;
         
@@ -532,6 +623,13 @@ public class PluginConfig {
          * Prevents the built-in "player has joined default" message
          */
         public boolean suppressDefaultMessages = true;
+        
+        /**
+         * Enable/disable world change messages.
+         * When true, broadcasts when players teleport between worlds.
+         * Set to false to completely hide world change notifications.
+         */
+        public boolean worldChangeEnabled = false;
     }
     
     // ==================== BROADCAST ====================
@@ -633,5 +731,33 @@ public class PluginConfig {
          * Aliases are stored in aliases.json
          */
         public boolean enabled = true;
+    }
+    
+    // ==================== ECONOMY ====================
+    
+    public static class EconomyConfig {
+        /** 
+         * Enable/disable the economy system.
+         * When disabled, /pay, /wallet, /baltop commands won't work.
+         */
+        public boolean enabled = false;
+        
+        /** Currency name (singular) */
+        public String currencyName = "coin";
+        
+        /** Currency name (plural) */
+        public String currencyNamePlural = "coins";
+        
+        /** Currency symbol for display */
+        public String currencySymbol = "$";
+        
+        /** Starting balance for new players */
+        public double startingBalance = 0.0;
+        
+        /** Minimum amount for /pay command */
+        public double minPayment = 1.0;
+        
+        /** Number of players to show in /baltop */
+        public int baltopLimit = 10;
     }
 }

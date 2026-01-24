@@ -7,26 +7,29 @@ import com.eliteessentials.integration.LuckPermsIntegration;
 import com.eliteessentials.listeners.ChatListener;
 import com.eliteessentials.listeners.JoinQuitListener;
 import com.eliteessentials.listeners.RespawnListener;
+import com.eliteessentials.services.AliasService;
+import com.eliteessentials.services.AutoBroadcastService;
 import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.CooldownService;
+import com.eliteessentials.services.CostService;
 import com.eliteessentials.services.DamageTrackingService;
 import com.eliteessentials.services.DeathTrackingService;
 import com.eliteessentials.services.GodService;
 import com.eliteessentials.services.HomeService;
 import com.eliteessentials.services.KitService;
 import com.eliteessentials.services.MessageService;
+import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.services.RtpService;
 import com.eliteessentials.services.SleepService;
 import com.eliteessentials.services.SpawnProtectionService;
 import com.eliteessentials.services.TpaService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.services.WarpService;
-import com.eliteessentials.services.AutoBroadcastService;
-import com.eliteessentials.services.AliasService;
 import com.eliteessentials.storage.BackStorage;
 import com.eliteessentials.storage.DiscordStorage;
 import com.eliteessentials.storage.HomeStorage;
 import com.eliteessentials.storage.MotdStorage;
+import com.eliteessentials.storage.PlayerStorage;
 import com.eliteessentials.storage.RulesStorage;
 import com.eliteessentials.storage.SpawnStorage;
 import com.eliteessentials.storage.WarpStorage;
@@ -39,6 +42,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.io.File;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * EliteEssentials - Essential commands for Hytale servers.
@@ -52,6 +56,7 @@ import java.util.logging.Level;
 public class EliteEssentials extends JavaPlugin {
 
     private static EliteEssentials instance;
+    private static final Logger logger = Logger.getLogger("EliteEssentials");
     
     private ConfigManager configManager;
     private HomeStorage homeStorage;
@@ -61,6 +66,7 @@ public class EliteEssentials extends JavaPlugin {
     private MotdStorage motdStorage;
     private RulesStorage rulesStorage;
     private DiscordStorage discordStorage;
+    private PlayerStorage playerStorage;
     private HomeService homeService;
     private BackService backService;
     private TpaService tpaService;
@@ -77,6 +83,8 @@ public class EliteEssentials extends JavaPlugin {
     private SpawnProtectionService spawnProtectionService;
     private AutoBroadcastService autoBroadcastService;
     private AliasService aliasService;
+    private PlayerService playerService;
+    private CostService costService;
     private HytaleFlyCommand flyCommand;
     private PlayerDeathSystem playerDeathSystem;
     private DamageTrackingSystem damageTrackingSystem;
@@ -138,6 +146,9 @@ public class EliteEssentials extends JavaPlugin {
         discordStorage = new DiscordStorage(this.dataFolder);
         discordStorage.load();
         
+        playerStorage = new PlayerStorage(this.dataFolder);
+        playerStorage.load();
+        
         // Initialize services
         cooldownService = new CooldownService();
         warmupService = new WarmupService();
@@ -156,6 +167,8 @@ public class EliteEssentials extends JavaPlugin {
         spawnProtectionService = new SpawnProtectionService(configManager);
         autoBroadcastService = new AutoBroadcastService(this.dataFolder);
         aliasService = new AliasService(this.dataFolder, getCommandRegistry());
+        playerService = new PlayerService(playerStorage, configManager);
+        costService = new CostService(configManager);
         
         getLogger().at(Level.INFO).log("EliteEssentials setup complete.");
     }
@@ -176,7 +189,7 @@ public class EliteEssentials extends JavaPlugin {
         getLogger().at(Level.INFO).log("Starter kit system registered.");
         
         // Register join/quit listener for join/quit messages, first join, and MOTD
-        joinQuitListener = new JoinQuitListener(configManager, motdStorage, this.dataFolder);
+        joinQuitListener = new JoinQuitListener(configManager, motdStorage, playerService, this.dataFolder);
         joinQuitListener.registerEvents(getEventRegistry());
         getLogger().at(Level.INFO).log("Join/Quit listener registered.");
         
@@ -250,6 +263,9 @@ public class EliteEssentials extends JavaPlugin {
         }
         
         getLogger().at(Level.INFO).log("EliteEssentials started successfully!");
+        
+        // Validate all JSON config files at the END of startup so errors are visible
+        validateConfigsOnStartup();
     }
 
     @Override
@@ -315,6 +331,12 @@ public class EliteEssentials extends JavaPlugin {
             autoBroadcastService.shutdown();
         }
         
+        // Save player cache
+        if (playerService != null) {
+            playerService.save();
+            getLogger().at(Level.INFO).log("Player cache saved.");
+        }
+        
         getLogger().at(Level.INFO).log("EliteEssentials disabled.");
     }
     
@@ -353,31 +375,24 @@ public class EliteEssentials extends JavaPlugin {
             e.printStackTrace();
         }
         try {
-            getCommandRegistry().registerCommand(new HytaleSetWarpCommand(warpService));
-            getLogger().at(Level.INFO).log("Registered /setwarp command");
-        } catch (Exception e) {
-            getLogger().at(Level.SEVERE).log("Failed to register /setwarp: " + e.getMessage());
-            e.printStackTrace();
-        }
-        try {
-            getCommandRegistry().registerCommand(new HytaleDelWarpCommand(warpService));
-            getLogger().at(Level.INFO).log("Registered /delwarp command");
-        } catch (Exception e) {
-            getLogger().at(Level.SEVERE).log("Failed to register /delwarp: " + e.getMessage());
-            e.printStackTrace();
-        }
-        try {
-            getCommandRegistry().registerCommand(new HytaleWarpsCommand(warpService));
-            getLogger().at(Level.INFO).log("Registered /warps command");
-        } catch (Exception e) {
-            getLogger().at(Level.SEVERE).log("Failed to register /warps: " + e.getMessage());
-            e.printStackTrace();
-        }
-        try {
             getCommandRegistry().registerCommand(new HytaleWarpAdminCommand(warpService));
             getLogger().at(Level.INFO).log("Registered /warpadmin command");
         } catch (Exception e) {
             getLogger().at(Level.SEVERE).log("Failed to register /warpadmin: " + e.getMessage());
+            e.printStackTrace();
+        }
+        try {
+            getCommandRegistry().registerCommand(new HytaleWarpSetPermCommand(warpService));
+            getLogger().at(Level.INFO).log("Registered /warpsetperm command");
+        } catch (Exception e) {
+            getLogger().at(Level.SEVERE).log("Failed to register /warpsetperm: " + e.getMessage());
+            e.printStackTrace();
+        }
+        try {
+            getCommandRegistry().registerCommand(new HytaleWarpSetDescCommand(warpService));
+            getLogger().at(Level.INFO).log("Registered /warpsetdesc command");
+        } catch (Exception e) {
+            getLogger().at(Level.SEVERE).log("Failed to register /warpsetdesc: " + e.getMessage());
             e.printStackTrace();
         }
         
@@ -388,7 +403,7 @@ public class EliteEssentials extends JavaPlugin {
         
         // New commands
         getCommandRegistry().registerCommand(new HytaleGodCommand(godService, configManager));
-        getCommandRegistry().registerCommand(new HytaleHealCommand(configManager));
+        getCommandRegistry().registerCommand(new HytaleHealCommand(configManager, cooldownService));
         getCommandRegistry().registerCommand(new HytaleMsgCommand(messageService, configManager));
         getCommandRegistry().registerCommand(new HytaleReplyCommand(messageService, configManager));
         getCommandRegistry().registerCommand(new HytaleTopCommand(backService, configManager));
@@ -403,7 +418,19 @@ public class EliteEssentials extends JavaPlugin {
         getCommandRegistry().registerCommand(new HytaleListCommand(configManager));
         getCommandRegistry().registerCommand(new HytaleDiscordCommand(configManager, discordStorage));
         
-        getLogger().at(Level.INFO).log("Commands registered: /home, /sethome, /delhome, /homes, /back, /rtp, /tpa, /tpahere, /tpaccept, /tpdeny, /tphere, /spawn, /setspawn, /warp, /setwarp, /delwarp, /warps, /warpadmin, /sleeppercent, /eliteessentials, /god, /heal, /msg, /reply, /top, /fly, /flyspeed, /kit, /motd, /rules, /broadcast, /clearinv, /list, /discord");
+        // Economy commands
+        getCommandRegistry().registerCommand(new HytaleWalletCommand(configManager, playerService));
+        getCommandRegistry().registerCommand(new HytalePayCommand(configManager, playerService));
+        getCommandRegistry().registerCommand(new HytaleBaltopCommand(configManager, playerService));
+        getCommandRegistry().registerCommand(new HytaleEcoCommand(configManager, playerService));
+        
+        // Player info commands
+        getCommandRegistry().registerCommand(new HytaleSeenCommand(configManager, playerService));
+        
+        // Help command
+        getCommandRegistry().registerCommand(new HytaleHelpCommand());
+        
+        getLogger().at(Level.INFO).log("Commands registered: /home, /sethome, /delhome, /homes, /back, /rtp, /tpa, /tpahere, /tpaccept, /tpdeny, /tphere, /spawn, /setspawn, /warp, /warpadmin, /warpsetperm, /warpsetdesc, /sleeppercent, /eliteessentials, /god, /heal, /msg, /reply, /top, /fly, /flyspeed, /kit, /motd, /rules, /broadcast, /clearinv, /list, /discord, /wallet, /pay, /baltop, /eco, /seen, /eehelp");
     }
 
     public static EliteEssentials getInstance() {
@@ -466,12 +493,36 @@ public class EliteEssentials extends JavaPlugin {
         return spawnStorage;
     }
     
+    public MotdStorage getMotdStorage() {
+        return motdStorage;
+    }
+    
+    public RulesStorage getRulesStorage() {
+        return rulesStorage;
+    }
+    
+    public DiscordStorage getDiscordStorage() {
+        return discordStorage;
+    }
+    
     public StarterKitEvent getStarterKitEvent() {
         return starterKitEvent;
     }
     
     public AliasService getAliasService() {
         return aliasService;
+    }
+    
+    public PlayerService getPlayerService() {
+        return playerService;
+    }
+    
+    public PlayerStorage getPlayerStorage() {
+        return playerStorage;
+    }
+    
+    public CostService getCostService() {
+        return costService;
     }
     
     public File getPluginDataFolder() {
@@ -495,6 +546,9 @@ public class EliteEssentials extends JavaPlugin {
         warpStorage.load();
         spawnStorage.load();
         
+        // Refresh spawn protection locations from reloaded spawn storage
+        spawnProtectionService.loadFromStorage(spawnStorage);
+        
         // Reload services
         kitService.reload();
         if (starterKitEvent != null) {
@@ -513,6 +567,11 @@ public class EliteEssentials extends JavaPlugin {
         // Reload aliases (note: deleted aliases won't be removed until restart)
         if (aliasService != null && configManager.getConfig().aliases.enabled) {
             aliasService.reload();
+        }
+        
+        // Reload player cache
+        if (playerService != null) {
+            playerService.reload();
         }
         
         getLogger().at(Level.INFO).log("Configuration reloaded.");
@@ -538,15 +597,42 @@ public class EliteEssentials extends JavaPlugin {
     }
     
     /**
-     * Initialize spawn protection location from stored spawn.
+     * Initialize spawn protection locations from stored spawns (per-world).
      */
     private void initializeSpawnProtectionLocation() {
-        SpawnStorage.SpawnData spawn = spawnStorage.getSpawn();
-        if (spawn != null) {
-            spawnProtectionService.setSpawnLocation(spawn.x, spawn.y, spawn.z);
-            getLogger().at(Level.INFO).log("Spawn protection initialized at: " + 
-                String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z) + " (radius: " + 
-                configManager.getConfig().spawnProtection.radius + ")");
+        // Load all per-world spawns into protection service
+        spawnProtectionService.loadFromStorage(spawnStorage);
+        
+        java.util.Set<String> protectedWorlds = spawnProtectionService.getProtectedWorlds();
+        if (!protectedWorlds.isEmpty()) {
+            int radius = configManager.getConfig().spawnProtection.radius;
+            getLogger().at(Level.INFO).log("Spawn protection initialized for " + protectedWorlds.size() + 
+                " world(s): " + String.join(", ", protectedWorlds) + " (radius: " + radius + ")");
+        }
+    }
+    
+    /**
+     * Validate all JSON config files on startup.
+     * Logs errors for any malformed files to help server admins catch issues early.
+     */
+    private void validateConfigsOnStartup() {
+        java.util.List<ConfigManager.ConfigValidationResult> errors = configManager.validateAllFiles();
+        
+        if (errors.isEmpty()) {
+            logger.info("All configuration files validated successfully.");
+        } else {
+            logger.severe("========================================");
+            logger.severe("  CONFIG VALIDATION ERRORS DETECTED!");
+            logger.severe("========================================");
+            
+            for (ConfigManager.ConfigValidationResult error : errors) {
+                logger.severe("File: " + error.getFilename());
+                logger.severe(error.getErrorMessage());
+                logger.severe("----------------------------------------");
+            }
+            
+            logger.severe("Fix these errors and restart the server or use /ee reload");
+            logger.severe("========================================");
         }
     }
 }

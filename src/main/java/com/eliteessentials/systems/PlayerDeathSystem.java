@@ -22,6 +22,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.util.UUID;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathComponent> {
 
@@ -30,7 +32,6 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
     private final BackService backService;
     private final ConfigManager configManager;
     private final DamageTrackingService damageTrackingService;
-    private boolean loggedDeathComponent = false;
 
     public PlayerDeathSystem(BackService backService, ConfigManager configManager, 
                              DamageTrackingService damageTrackingService) {
@@ -55,11 +56,6 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
         try {
             Universe universe = Universe.get();
             if (universe == null) return;
-            
-            // Debug: Log DeathComponent methods and values (only if debug enabled)
-            if (configManager.isDebugEnabled()) {
-                logDeathComponentInfo(deathComponent);
-            }
             
             ComponentType<EntityStore, PlayerRef> playerRefType = universe.getPlayerRefComponentType();
             if (playerRefType == null) return;
@@ -110,70 +106,6 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
         }
     }
     
-    private void logDeathComponentInfo(DeathComponent deathComponent) {
-        if (loggedDeathComponent) return;
-        loggedDeathComponent = true;
-        
-        try {
-            logger.info("[PlayerDeathSystem] === DeathComponent Debug Info ===");
-            
-            // Log all methods
-            StringBuilder sb = new StringBuilder();
-            sb.append("[PlayerDeathSystem] DeathComponent methods: ");
-            for (var method : deathComponent.getClass().getMethods()) {
-                if (method.getParameterCount() == 0 && !method.getName().equals("getClass")) {
-                    sb.append(method.getName()).append("(), ");
-                }
-            }
-            logger.info(sb.toString());
-            
-            // Try to invoke getter methods
-            for (var method : deathComponent.getClass().getMethods()) {
-                if (method.getParameterCount() == 0 && 
-                    (method.getName().startsWith("get") || method.getName().startsWith("is")) &&
-                    !method.getName().equals("getClass")) {
-                    try {
-                        Object result = method.invoke(deathComponent);
-                        String resultStr = result != null ? result.toString() : "null";
-                        if (resultStr.length() > 200) resultStr = resultStr.substring(0, 200) + "...";
-                        logger.info("[PlayerDeathSystem] " + method.getName() + "() = " + resultStr + 
-                                   (result != null ? " [" + result.getClass().getName() + "]" : ""));
-                        
-                        // If result is an object, log its methods too
-                        if (result != null && !result.getClass().isPrimitive() && 
-                            !result.getClass().getName().startsWith("java.lang")) {
-                            logObjectMethods(result, method.getName());
-                        }
-                    } catch (Exception e) {
-                        logger.info("[PlayerDeathSystem] " + method.getName() + "() = ERROR: " + e.getMessage());
-                    }
-                }
-            }
-            
-            logger.info("[PlayerDeathSystem] === End Debug Info ===");
-        } catch (Exception e) {
-            logger.warning("[PlayerDeathSystem] Error logging DeathComponent: " + e.getMessage());
-        }
-    }
-    
-    private void logObjectMethods(Object obj, String parentName) {
-        try {
-            for (var method : obj.getClass().getMethods()) {
-                if (method.getParameterCount() == 0 && 
-                    (method.getName().startsWith("get") || method.getName().startsWith("is")) &&
-                    !method.getName().equals("getClass")) {
-                    try {
-                        Object result = method.invoke(obj);
-                        String resultStr = result != null ? result.toString() : "null";
-                        if (resultStr.length() > 100) resultStr = resultStr.substring(0, 100) + "...";
-                        logger.info("[PlayerDeathSystem]   -> " + parentName + "." + method.getName() + "() = " + resultStr +
-                                   (result != null ? " [" + result.getClass().getSimpleName() + "]" : ""));
-                    } catch (Exception e) { }
-                }
-            }
-        } catch (Exception e) { }
-    }
-    
     private void broadcastDeathMessage(Universe universe, String message) {
         Message chatMessage = Message.raw(message).color("#FF5555");
         for (PlayerRef player : universe.getPlayers()) {
@@ -193,11 +125,15 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
             if (deathMessage != null) {
                 String ansiMessage = deathMessage.getAnsiMessage();
                 if (ansiMessage != null && !ansiMessage.isEmpty()) {
-                    // Check if the message contains unresolved StringParamValue objects
-                    // These show up as "StringParamValue@" in the raw output
-                    if (ansiMessage.contains("StringParamValue@") || ansiMessage.contains("ParamValue@")) {
-                        if (configManager.isDebugEnabled()) {
-                            logger.info("[PlayerDeathSystem] Skipping unresolved death message: " + ansiMessage);
+                    // Check if the message is malformed/unresolved
+                    // This can happen due to locale issues or missing translations
+                    if (isUnresolvedMessage(ansiMessage)) {
+                        // Try to extract NPC name from unresolved message pattern
+                        // Pattern: server.npcRoles.Wolf_Black.name or server.npcRoles.Skeleton.name
+                        String extractedName = extractNpcNameFromUnresolved(ansiMessage);
+                        if (extractedName != null) {
+                            return configManager.getMessage("deathByEntity", 
+                                "player", playerName, "killer", extractedName);
                         }
                         // Fall through to other methods
                     } else {
@@ -206,15 +142,12 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
                         String thirdPerson = ansiMessage
                             .replace("You were", playerName + " was")
                             .replace("You ", playerName + " ");
-                        if (configManager.isDebugEnabled()) {
-                            logger.info("[PlayerDeathSystem] Using death message: " + thirdPerson);
-                        }
                         return thirdPerson;
                     }
                 }
             }
         } catch (Exception e) {
-            logger.fine("[PlayerDeathSystem] Could not get death message: " + e.getMessage());
+            // Fall through to other methods
         }
         
         // Try to extract from getDeathInfo()
@@ -224,23 +157,21 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
                 var source = deathInfo.getSource();
                 if (source != null) {
                     String sourceClass = source.getClass().getSimpleName();
-                    if (configManager.isDebugEnabled()) {
-                        logger.info("[PlayerDeathSystem] Death source type: " + sourceClass);
-                    }
                     
                     if (sourceClass.contains("Entity")) {
                         // Try to get entity name from source
                         String entityName = getEntityNameFromSource(source, universe);
                         if (entityName != null) {
-                            return playerName + " was killed by " + entityName;
+                            return configManager.getMessage("deathByEntity",
+                                "player", playerName, "killer", entityName);
                         }
-                        return playerName + " was killed";
+                        return configManager.getMessage("deathGeneric", "player", playerName);
                     } else if (sourceClass.contains("Projectile")) {
-                        return playerName + " was shot";
+                        return configManager.getMessage("deathByProjectile", "player", playerName);
                     } else if (sourceClass.contains("Environment")) {
                         var cause = deathInfo.getCause();
                         if (cause != null) {
-                            return playerName + getCauseMessage(cause.getId());
+                            return getDeathMessageByCause(playerName, cause.getId());
                         }
                     }
                 }
@@ -248,15 +179,11 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
                 // Fall back to cause
                 var cause = deathInfo.getCause();
                 if (cause != null) {
-                    String causeId = cause.getId();
-                    if (configManager.isDebugEnabled()) {
-                        logger.info("[PlayerDeathSystem] Death cause: " + causeId);
-                    }
-                    return playerName + getCauseMessage(causeId);
+                    return getDeathMessageByCause(playerName, cause.getId());
                 }
             }
         } catch (Exception e) {
-            logger.fine("[PlayerDeathSystem] Could not get death info: " + e.getMessage());
+            // Fall through to other methods
         }
         
         // Fall back to damage tracking service
@@ -265,7 +192,8 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
             if (attackerId != null) {
                 PlayerRef attacker = universe.getPlayer(attackerId);
                 if (attacker != null && attacker.isValid()) {
-                    return playerName + " was killed by " + attacker.getUsername();
+                    return configManager.getMessage("deathByPlayer",
+                        "player", playerName, "killer", attacker.getUsername());
                 }
             }
             
@@ -273,35 +201,49 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
             if (cause != null) {
                 if (cause.startsWith("ENTITY:")) {
                     String entityType = cause.substring(7);
-                    return playerName + " was killed by " + formatEntityName(entityType);
+                    return configManager.getMessage("deathByEntity",
+                        "player", playerName, "killer", formatEntityName(entityType));
                 }
-                return playerName + getCauseMessage(cause);
+                return getDeathMessageByCause(playerName, cause);
             }
         }
         
-        return playerName + " died";
+        return configManager.getMessage("deathGeneric", "player", playerName);
+    }
+    
+    /**
+     * Get the appropriate death message based on cause, using configurable messages.
+     */
+    private String getDeathMessageByCause(String playerName, String cause) {
+        if (cause == null) {
+            return configManager.getMessage("deathGeneric", "player", playerName);
+        }
+        
+        String messageKey = switch (cause.toUpperCase()) {
+            case "FALL", "FALLING" -> "deathByFall";
+            case "FIRE", "FIRE_TICK", "BURNING" -> "deathByFire";
+            case "LAVA" -> "deathByLava";
+            case "DROWNING", "DROWN" -> "deathByDrowning";
+            case "SUFFOCATION", "SUFFOCATE" -> "deathBySuffocation";
+            case "VOID", "OUT_OF_WORLD" -> "deathByVoid";
+            case "STARVATION", "STARVE" -> "deathByStarvation";
+            case "PROJECTILE", "ARROW" -> "deathByProjectile";
+            case "EXPLOSION", "EXPLODE" -> "deathByExplosion";
+            case "LIGHTNING" -> "deathByLightning";
+            case "FREEZE", "FREEZING" -> "deathByFreeze";
+            case "POISON" -> "deathByPoison";
+            case "WITHER" -> "deathByWither";
+            default -> "deathGeneric";
+        };
+        
+        return configManager.getMessage(messageKey, "player", playerName);
     }
     
     private String getEntityNameFromSource(Object source, Universe universe) {
         try {
             // Try getRef() to get entity reference
             try {
-                var getRef = source.getClass().getMethod("getRef");
-                Object ref = getRef.invoke(source);
-                if (ref != null && configManager.isDebugEnabled()) {
-                    logger.info("[PlayerDeathSystem] Got ref from source: " + ref + " [" + ref.getClass().getSimpleName() + "]");
-                    // Log ref methods
-                    for (var method : ref.getClass().getMethods()) {
-                        if (method.getParameterCount() == 0 && 
-                            (method.getName().startsWith("get") || method.getName().startsWith("is")) &&
-                            !method.getName().equals("getClass")) {
-                            try {
-                                Object result = method.invoke(ref);
-                                logger.info("[PlayerDeathSystem]   ref." + method.getName() + "() = " + result);
-                            } catch (Exception e) { }
-                        }
-                    }
-                }
+                source.getClass().getMethod("getRef");
             } catch (NoSuchMethodException e) { }
             
             // Try getEntity()
@@ -335,24 +277,91 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
         return readable.toLowerCase();
     }
     
-    private String getCauseMessage(String cause) {
-        if (cause == null) return " died";
-        return switch (cause.toUpperCase()) {
-            case "FALL", "FALLING" -> " fell to their death";
-            case "FIRE", "FIRE_TICK", "LAVA", "BURNING" -> " burned to death";
-            case "DROWNING", "DROWN" -> " drowned";
-            case "SUFFOCATION", "SUFFOCATE" -> " suffocated";
-            case "VOID", "OUT_OF_WORLD" -> " fell into the void";
-            case "STARVATION", "STARVE" -> " starved to death";
-            case "PROJECTILE", "ARROW" -> " was shot";
-            case "EXPLOSION", "EXPLODE" -> " blew up";
-            case "LIGHTNING" -> " was struck by lightning";
-            case "FREEZE", "FREEZING" -> " froze to death";
-            case "POISON" -> " was poisoned";
-            case "WITHER" -> " withered away";
-            case "PLAYER" -> " was killed";
-            default -> " died";
-        };
+    /**
+     * Extract NPC/entity name from unresolved death message.
+     * Handles patterns like: server.npcRoles.Wolf_Black.name or server.npcRoles.Skeleton.name
+     * 
+     * @param message The unresolved message string
+     * @return Formatted entity name (e.g., "Black Wolf", "Skeleton") or null if not found
+     */
+    private String extractNpcNameFromUnresolved(String message) {
+        if (message == null) return null;
+        
+        // Pattern to match: server.npcRoles.ENTITY_NAME.name
+        // Examples: server.npcRoles.Wolf_Black.name, server.npcRoles.Skeleton.name
+        Pattern pattern = Pattern.compile("server\\.npcRoles\\.([^.]+)\\.name");
+        Matcher matcher = pattern.matcher(message);
+        
+        if (matcher.find()) {
+            String rawName = matcher.group(1);
+            return formatNpcName(rawName);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Format NPC name from internal format to readable format.
+     * Simply replaces underscores with spaces - keeps original order.
+     * Examples:
+     * - "Wolf_Black" -> "Wolf Black"
+     * - "Skeleton" -> "Skeleton"
+     * - "Bear_Grizzly" -> "Bear Grizzly"
+     * - "Feran_Longtooth" -> "Feran Longtooth"
+     */
+    private String formatNpcName(String rawName) {
+        if (rawName == null || rawName.isEmpty()) return "a creature";
+        
+        // Simply replace underscores with spaces and capitalize each word
+        String[] parts = rawName.split("_");
+        StringBuilder result = new StringBuilder();
+        for (String part : parts) {
+            if (result.length() > 0) result.append(" ");
+            result.append(capitalize(part));
+        }
+        
+        return result.toString();
+    }
+    
+    /**
+     * Capitalize first letter of a word.
+     */
+    private String capitalize(String word) {
+        if (word == null || word.isEmpty()) return word;
+        return word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase();
+    }
+    
+    /**
+     * Check if a death message is unresolved/malformed.
+     * This can happen due to locale issues, missing translations, or serialization problems.
+     * 
+     * Detects patterns like:
+     * - "StringParamValue@abc123" (unresolved parameter)
+     * - "FormattedMessage@abc123" (raw object toString)
+     * - "server.general.killedBy" (raw localization key)
+     * - Object hash patterns like "@a1b2c3d4"
+     */
+    private boolean isUnresolvedMessage(String message) {
+        if (message == null) return true;
+        
+        // Check for raw object toString patterns (ClassName@hexhash)
+        if (message.contains("@") && message.matches(".*@[0-9a-fA-F]+.*")) {
+            return true;
+        }
+        
+        // Check for unresolved localization keys
+        if (message.contains("server.general.") || message.contains("server.npc")) {
+            return true;
+        }
+        
+        // Check for specific known bad patterns
+        if (message.contains("StringParamValue") || 
+            message.contains("ParamValue") || 
+            message.contains("FormattedMessage")) {
+            return true;
+        }
+        
+        return false;
     }
 
     @Override

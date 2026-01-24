@@ -64,8 +64,9 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         WarmupService warmupService = EliteEssentials.getInstance().getWarmupService();
         SpawnStorage spawnStorage = EliteEssentials.getInstance().getSpawnStorage();
         
-        // Check permission and enabled state
-        if (!CommandPermissionUtil.canExecute(ctx, player, Permissions.SPAWN, config.spawn.enabled)) {
+        // Check permission and enabled state with cost
+        if (!CommandPermissionUtil.canExecuteWithCost(ctx, player, Permissions.SPAWN, 
+                config.spawn.enabled, "spawn", config.spawn.cost)) {
             return;
         }
         

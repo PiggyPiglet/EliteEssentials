@@ -18,6 +18,12 @@ public class SimpleStringArg extends SingleArgumentType<String> {
     // Warp name for /warp, /setwarp, /delwarp
     public static final SimpleStringArg WARP_NAME = new SimpleStringArg("WarpName", "Warp name", new String[]{"spawn", "shop", "arena"});
     
+    // Warp subcommand for /warpadmin
+    public static final SimpleStringArg WARP_SUBCOMMAND = new SimpleStringArg("Subcommand", "create/delete/info", new String[]{"create", "delete", "info"});
+    
+    // Description for warp descriptions
+    public static final SimpleStringArg DESCRIPTION = new SimpleStringArg("Description", "Description text", new String[]{"Main spawn point", "Player shop area"});
+    
     // ===== KIT COMMANDS =====
     // Kit name for /kit create, /kit delete
     public static final SimpleStringArg KIT_NAME = new SimpleStringArg("KitName", "Kit name", new String[]{"Starter", "Warrior", "Builder"});
@@ -41,6 +47,7 @@ public class SimpleStringArg extends SingleArgumentType<String> {
     // ===== GREEDY STRING =====
     // Greedy string - captures all remaining text
     public static final SimpleStringArg GREEDY = new SimpleStringArg("Message", "Message text", new String[]{"Hello world!", "This is a test"});
+    public static final SimpleStringArg GREEDY_STRING = new SimpleStringArg("Text", "Text description", new String[]{"A description", "Some text here"});
 
     private final String[] examples;
 

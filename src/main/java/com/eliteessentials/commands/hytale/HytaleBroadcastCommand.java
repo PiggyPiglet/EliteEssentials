@@ -47,7 +47,7 @@ public class HytaleBroadcastCommand extends CommandBase {
         PermissionService perms = PermissionService.get();
         if (!perms.canUseAdminCommand(ctx.sender(), Permissions.BROADCAST, 
                 configManager.getConfig().broadcast.enabled)) {
-            ctx.sendMessage(Message.raw(configManager.getMessage("noPermission")).color("#FF5555"));
+            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
             return;
         }
         

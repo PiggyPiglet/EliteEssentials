@@ -1,5 +1,6 @@
 {
   "_comment": "EliteEssentials Configuration - Edit these values to customize the plugin",
+  "_note": "Messages are stored separately in messages.json",
   
   "debug": false,
   "advancedPermissions": false,
@@ -11,7 +12,11 @@
     "cooldownSeconds": 30,
     "warmupSeconds": 3,
     "maxAttempts": 10,
-    "minSurfaceY": 50
+    "minSurfaceY": 50,
+    "chunkLoadTimeoutMs": 500,
+    "defaultHeight": 128,
+    "invulnerabilitySeconds": 5,
+    "cost": 0.0
   },
   
   "back": {
@@ -19,13 +24,16 @@
     "maxHistory": 5,
     "workOnDeath": true,
     "cooldownSeconds": 0,
-    "warmupSeconds": 0
+    "warmupSeconds": 0,
+    "cost": 0.0
   },
   
   "tpa": {
     "enabled": true,
     "timeoutSeconds": 30,
-    "warmupSeconds": 3
+    "warmupSeconds": 3,
+    "cost": 0.0,
+    "tpahereCost": 0.0
   },
   
   "homes": {
@@ -33,13 +41,33 @@
     "maxHomes": 3,
     "defaultMaxHomes": 3,
     "cooldownSeconds": 0,
-    "warmupSeconds": 3
+    "warmupSeconds": 3,
+    "cost": 0.0,
+    "setHomeCost": 0.0
   },
   
   "spawn": {
     "enabled": true,
     "cooldownSeconds": 0,
-    "warmupSeconds": 3
+    "warmupSeconds": 3,
+    "perWorld": false,
+    "mainWorld": "default",
+    "cost": 0.0
+  },
+  
+  "warps": {
+    "enabled": true,
+    "cooldownSeconds": 0,
+    "warmupSeconds": 3,
+    "maxWarps": -1,
+    "cost": 0.0,
+    "groupLimits": {
+      "Admin": -1,
+      "Owner": -1,
+      "Moderator": 20,
+      "VIP": 10,
+      "Default": 5
+    }
   },
   
   "sleep": {
@@ -58,7 +86,9 @@
   },
   
   "heal": {
-    "enabled": true
+    "enabled": true,
+    "cooldownSeconds": 0,
+    "cost": 0.0
   },
   
   "msg": {
@@ -70,7 +100,8 @@
   },
   
   "top": {
-    "enabled": true
+    "enabled": true,
+    "cost": 0.0
   },
   
   "kits": {
@@ -83,16 +114,84 @@
     "radius": 50,
     "minY": -1,
     "maxY": -1,
-    "disablePvp": true
+    "disablePvp": true,
+    "disableAllDamage": false
   },
   
-  "messages": {
-    "prefix": "[EliteEssentials] ",
-    "noPermission": "You don't have permission to use this command.",
-    "playerNotFound": "Player not found.",
-    "commandDisabled": "This command is disabled.",
-    "onCooldown": "You must wait {seconds} seconds before using this command again.",
-    "warmupStarted": "Teleporting in {seconds} seconds. Don't move!",
-    "warmupCancelled": "Teleport cancelled - you moved!"
+  "motd": {
+    "enabled": true,
+    "showOnJoin": true,
+    "delaySeconds": 1,
+    "serverName": "Our Server"
+  },
+  
+  "rules": {
+    "enabled": true
+  },
+  
+  "joinMsg": {
+    "joinEnabled": true,
+    "quitEnabled": true,
+    "firstJoinEnabled": true,
+    "suppressDefaultMessages": true,
+    "worldChangeEnabled": false
+  },
+  
+  "broadcast": {
+    "enabled": true
+  },
+  
+  "clearInv": {
+    "enabled": true
+  },
+  
+  "list": {
+    "enabled": true,
+    "maxPlayers": 100
+  },
+  
+  "chatFormat": {
+    "enabled": true,
+    "defaultFormat": "&7{player}: &f{message}",
+    "groupFormats": {
+      "Owner": "&4[Owner] {player}&r: {message}",
+      "Admin": "&c[Admin] {player}&r: {message}",
+      "Moderator": "&9[Mod] {player}&r: {message}",
+      "OP": "&c[OP] {player}&r: {message}",
+      "VIP": "&6[VIP] {player}&r: {message}",
+      "Player": "&a{player}&r: {message}",
+      "Default": "&7{player}&r: {message}"
+    },
+    "groupPriorities": {
+      "Owner": 100,
+      "Admin": 90,
+      "Moderator": 80,
+      "OP": 75,
+      "VIP": 50,
+      "Player": 10,
+      "Default": 0
+    }
+  },
+  
+  "discord": {
+    "enabled": true
+  },
+  
+  "autoBroadcast": {
+    "enabled": true
+  },
+  
+  "aliases": {
+    "enabled": true
+  },
+  
+  "economy": {
+    "enabled": false,
+    "currencyName": "coin",
+    "currencyNamePlural": "coins",
+    "currencySymbol": "$",
+    "startingBalance": 0.0,
+    "minPayment": 1.0,
+    "baltopLimit": 10
   }
 }

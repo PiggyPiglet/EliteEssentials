@@ -2,6 +2,157 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.1.0] - 2026-01-23
+
+### Added
+
+- **Clickable GUI for Homes**: `/homes` now opens a clickable GUI to select and teleport to homes
+  - Respects warmup, cooldown, and cost settings
+  - Shows home names and coordinates
+  - Click to teleport with full permission checks
+
+- **Clickable GUI for Warps**: `/warp` (no args) now opens a clickable GUI to browse warps
+  - Shows warp names and descriptions
+  - Respects warmup, cooldown, and cost settings
+  - Permission-based filtering (only shows warps you can access)
+
+- **Warp Descriptions**: Warps now support optional descriptions
+  - Set via `/warpsetdesc <name> <description...>`
+  - Displayed in warp GUI and `/warp list`
+
+- **`/eehelp` Command**: Shows all EliteEssentials commands you have permission to use
+  - Dynamically filters based on your permissions
+  - Hides admin commands from non-admins
+  - Alias: `/ehelp`
+
+- **Separate Warp List/Use Permissions**: Fine-grained warp access control
+  - `eliteessentials.command.warp.list` - Can open GUI and see warp list
+  - `eliteessentials.command.warp.use` - Can teleport to ALL public warps
+  - `eliteessentials.command.warp.<name>` - Can teleport to specific warp only
+
+- **Silent Alias Mode**: Suppress teleport messages when using command aliases
+  - Add `"silent": true` to any alias in `aliases.json` to hide teleport confirmation messages
+  - Warmup countdown messages (3... 2... 1...) still display so players know something is happening
+  - Only the initial "Teleporting to warp 'X' in Y seconds..." and final "Teleported to warp 'X'" messages are hidden
+  - Useful when combined with per-world MOTDs that provide context instead
+  - Example: `{ "command": "warp explore", "permission": "everyone", "silent": true }`
+
+- **Per-World MOTD System**: Configure unique MOTDs for each world
+  - Global MOTD now only shows on initial server join (not when changing worlds)
+  - Per-world MOTDs in `motd.json` under `worldMotds` section
+  - `enabled` - Enable/disable the world's MOTD
+  - `showAlways` - When true, shows every time player enters the world; when false, shows once per session
+  - Same placeholders as global MOTD: `{player}`, `{server}`, `{world}`, `{playercount}`
+  - Example config in motd.json for "explore" world
+
+- **Command Cost System**: Charge players for using commands (requires economy enabled)
+  - Configurable cost per command (default 0.0 = free)
+  - Supported commands: `/home`, `/sethome`, `/spawn`, `/warp`, `/back`, `/rtp`, `/tpa`, `/tpahere`
+  - Admins automatically bypass all costs
+  - Bypass permissions for VIP players
+  - Shows cost deducted message or insufficient funds error
+  - New config options:
+    - `homes.cost` - Cost to teleport home
+    - `homes.setHomeCost` - Cost to set a home
+    - `spawn.cost` - Cost to teleport to spawn
+    - `warps.cost` - Cost to use a warp
+    - `back.cost` - Cost to return to previous location
+    - `rtp.cost` - Cost for random teleport
+    - `tpa.cost` - Cost to send a teleport request
+    - `tpa.tpahereCost` - Cost to request someone teleport to you
+  - New permissions:
+    - `eliteessentials.bypass.cost` - Bypass all command costs
+    - `eliteessentials.bypass.cost.<command>` - Bypass cost for specific command
+  - New messages: `costCharged`, `costInsufficientFunds`, `costFailed`
+
+- **Player Cache System**: Comprehensive player data tracking stored in `players.json`
+  - Tracks: UUID, name, firstJoin, lastSeen, wallet, playTime (in seconds), lastKnownIp
+  - Automatic play time tracking (updates on player quit)
+  - Name updates when players rejoin with different names
+  - Used by economy system and available for future features
+  - New classes: `PlayerData`, `PlayerStorage`, `PlayerService`
+
+- **Economy System** (disabled by default): Full-featured economy with API for other mods
+  - `/wallet` - View your balance
+  - `/wallet <player>` - View another player's balance (requires permission)
+  - `/wallet set <player> <amount>` - Set a player's balance (admin)
+  - `/wallet add <player> <amount>` - Add to a player's balance (admin)
+  - `/wallet remove <player> <amount>` - Remove from a player's balance (admin)
+  - `/pay <player> <amount>` - Send money to another player
+  - `/baltop` - View richest players leaderboard
+  - Config options: `economy.enabled`, `currencyName`, `currencyNamePlural`, `currencySymbol`, `startingBalance`, `minPayment`, `baltopLimit`
+  - Permissions: `WALLET`, `WALLET_OTHERS`, `WALLET_ADMIN`, `PAY`, `BALTOP`
+
+- **Economy API**: Public API for other mods to integrate with EliteEssentials economy
+  - `EconomyAPI.getBalance(UUID)` - Get player balance
+  - `EconomyAPI.has(UUID, double)` - Check if player has enough funds
+  - `EconomyAPI.withdraw(UUID, double)` - Remove money from player
+  - `EconomyAPI.deposit(UUID, double)` - Add money to player
+  - `EconomyAPI.transfer(UUID, UUID, double)` - Transfer between players
+  - `EconomyAPI.setBalance(UUID, double)` - Set exact balance
+  - `EconomyAPI.format(double)` - Format amount with currency symbol
+  - Located at `com.eliteessentials.api.EconomyAPI`
+
+- **Quit/Leave Messages**: Configurable player quit/leave messages
+  - Config option: `joinMsg.quitEnabled` (true by default)
+  - Message key: `quitMessage` with `{player}` placeholder
+  - Default: `&e{player} &7left the server.`
+  - Suppresses default Hytale leave messages (same as join messages)
+
+- **Console Economy Command**: `/eco` command for server console
+  - `/eco check <player>` - Check a player's balance
+  - `/eco set <player> <amount>` - Set a player's balance
+  - `/eco add <player> <amount>` - Add to a player's balance
+  - `/eco remove <player> <amount>` - Remove from a player's balance
+  - Can be run from console or by admins in-game
+  - Alias: `/economy`
+
+### Changed
+
+- **Warp Command Consolidation**: Cleaner command structure
+  - `/warp` - Opens GUI
+  - `/warp <name>` - Teleport to warp
+  - `/warp list` - Text list of warps
+  - `/warpadmin create <name>` - Create warp at current location
+  - `/warpadmin delete <name>` - Delete a warp
+  - `/warpadmin info <name>` - Show warp details
+  - `/warpsetperm <name> <all|op>` - Set warp permission level
+  - `/warpsetdesc <name> <description>` - Set warp description
+  - Removed old `/setwarp`, `/delwarp`, `/warps` commands
+
+- **Admin Permission Check**: Now recognizes both `eliteessentials.admin.*` and `eliteessentials.admin` (without wildcard)
+
+- `PlayerService` now accepts `ConfigManager` for starting balance configuration
+
+- Join/quit listener updated to track play time and update player cache
+
+### Fixed
+
+- **`/eehelp` showing no commands for admins**: Admins now see all commands regardless of individual permission nodes
+
+- **Spawn protection not working for per-world spawns**: Spawn protection now works for ALL worlds with `/setspawn`
+  - Previously only protected the first/main world spawn
+  - Now each world with a spawn set via `/setspawn` has its own protected area
+  - `/setspawn` immediately updates spawn protection for that world
+  - `/ee reload` refreshes spawn protection from all stored spawns
+
+- **Silent aliases not showing permission errors**: When using a silent alias (e.g., `/explore` -> `/warp explore`), permission errors now always display
+  - Previously, if a player didn't have permission, nothing happened and no message was shown
+  - Now error messages (no permission, warp not found, insufficient funds, etc.) always show
+  - Only success/warmup messages are suppressed in silent mode
+  - Also added missing permission checks to alias commands: heal, god, fly, spawn
+
+- **MOTD showing on world changes**: Global MOTD now only displays on initial server join, not when players teleport between worlds or enter instances
+
+- **Warp permissions in advanced mode**: Players with only specific warp permissions (e.g., `warp.spawn`) can now use those warps without needing `warp.use`
+  - `warp.use` grants access to ALL public warps
+  - `warp.<name>` grants access to only that specific warp
+  - Both work independently in advanced permissions mode
+
+### Known Issues
+
+- **World leave messages cannot be suppressed**: The default Hytale "has left [world]" message (e.g., "EliteScouter has left explore") cannot be suppressed by plugins. The Hytale Server API provides `AddPlayerToWorldEvent.setBroadcastJoinMessage(false)` for join messages, but `DrainPlayerFromWorldEvent` has no equivalent method for leave messages. This will be fixed when Hypixel adds the ability to suppress world leave broadcasts.
+
 ## [1.0.9] - 2026-01-20
 
 ### Added

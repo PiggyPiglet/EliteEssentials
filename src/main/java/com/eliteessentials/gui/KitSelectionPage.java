@@ -75,7 +75,7 @@ public class KitSelectionPage extends InteractiveCustomUIPage<KitSelectionPage.K
             // Set description
             commandBuilder.set(selector + " #KitDescription.Text", kit.getDescription());
 
-            // Check permission and cooldown
+            // Check kit-specific permission
             String kitPermission = Permissions.kitAccess(kit.getId());
             boolean hasPermission = PermissionService.get().canUseEveryoneCommand(playerId, kitPermission, true) ||
                                    PermissionService.get().isAdmin(playerId);

@@ -3,6 +3,7 @@ package com.eliteessentials.util;
 import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.permissions.PermissionService;
+import com.eliteessentials.services.CostService;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -137,5 +138,55 @@ public class CommandPermissionUtil {
     public static void sendCommandDisabled(CommandContext ctx) {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
         ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("commandDisabled"), "#FF5555"));
+    }
+
+    /**
+     * Check if a command can be executed with cost.
+     * Combines permission check and cost charge in one call.
+     * 
+     * @param ctx Command context
+     * @param player Player executing the command
+     * @param permission Permission to check
+     * @param enabled Whether the command is enabled
+     * @param commandName Command name for cost bypass check
+     * @param cost Cost to charge (0 = free)
+     * @return true if command can proceed (has permission and paid/bypassed cost)
+     */
+    public static boolean canExecuteWithCost(CommandContext ctx, PlayerRef player, 
+            String permission, boolean enabled, String commandName, double cost) {
+        // First check permission
+        if (!canExecute(ctx, player, permission, enabled)) {
+            return false;
+        }
+        
+        // Then check/charge cost
+        CostService costService = EliteEssentials.getInstance().getCostService();
+        if (costService != null) {
+            return costService.chargeIfNeeded(ctx, player, commandName, cost);
+        }
+        
+        return true;
+    }
+
+    /**
+     * Check if a player can bypass cost for a command.
+     */
+    public static boolean canBypassCost(UUID playerId, String commandName) {
+        CostService costService = EliteEssentials.getInstance().getCostService();
+        if (costService != null) {
+            return costService.canBypassCost(playerId, commandName);
+        }
+        return true;
+    }
+
+    /**
+     * Get the effective cost for a player (0 if they can bypass).
+     */
+    public static double getEffectiveCost(UUID playerId, String commandName, double configCost) {
+        CostService costService = EliteEssentials.getInstance().getCostService();
+        if (costService != null) {
+            return costService.getEffectiveCost(playerId, commandName, configCost);
+        }
+        return 0.0;
     }
 }

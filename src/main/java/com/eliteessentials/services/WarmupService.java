@@ -49,6 +49,16 @@ public class WarmupService {
     public void startWarmup(PlayerRef player, Vector3d startPosition, int warmupSeconds, 
                             Runnable onComplete, String commandName,
                             World world, Store<EntityStore> store, Ref<EntityStore> ref) {
+        startWarmup(player, startPosition, warmupSeconds, onComplete, commandName, world, store, ref, false);
+    }
+    
+    /**
+     * Start a warmup for a player with optional silent mode.
+     * @param silent If true, suppress countdown messages (but still show cancel message if moved)
+     */
+    public void startWarmup(PlayerRef player, Vector3d startPosition, int warmupSeconds, 
+                            Runnable onComplete, String commandName,
+                            World world, Store<EntityStore> store, Ref<EntityStore> ref, boolean silent) {
         UUID playerId = player.getUuid();
         
         // Cancel any existing warmup for this player
@@ -76,7 +86,7 @@ public class WarmupService {
         long endTimeNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(warmupSeconds);
         PendingWarmup warmup = new PendingWarmup(
             playerId, ref, new Vector3d(startPosition), endTimeNanos,
-            onComplete, commandName, world, store, warmupSeconds
+            onComplete, commandName, world, store, warmupSeconds, silent
         );
         
         pending.put(playerId, warmup);
@@ -195,9 +205,9 @@ public class WarmupService {
             return;
         }
         
-        // Announce countdown (only when seconds change)
+        // Announce countdown (only when seconds change, and not in silent mode)
         int remainingSeconds = (int) Math.ceil(remainingNanos / 1_000_000_000.0);
-        if (remainingSeconds != warmup.lastAnnouncedSeconds && remainingSeconds > 0) {
+        if (!warmup.silent && remainingSeconds != warmup.lastAnnouncedSeconds && remainingSeconds > 0) {
             warmup.lastAnnouncedSeconds = remainingSeconds;
             playerComponent.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warmupCountdown", "seconds", String.valueOf(remainingSeconds)), "#FFAA00"));
         }
@@ -271,12 +281,13 @@ public class WarmupService {
         final String commandName;
         final World world;
         final Store<EntityStore> store;
+        final boolean silent;
         volatile boolean cancelled = false;
         int lastAnnouncedSeconds;
 
         PendingWarmup(UUID playerUuid, Ref<EntityStore> playerRef, Vector3d startPos, 
                       long endTimeNanos, Runnable onComplete, String commandName,
-                      World world, Store<EntityStore> store, int initialSeconds) {
+                      World world, Store<EntityStore> store, int initialSeconds, boolean silent) {
             this.playerUuid = playerUuid;
             this.playerRef = playerRef;
             this.startPos = startPos;
@@ -285,6 +296,7 @@ public class WarmupService {
             this.commandName = commandName;
             this.world = world;
             this.store = store;
+            this.silent = silent;
             this.lastAnnouncedSeconds = initialSeconds + 1; // So first tick announces
         }
     }

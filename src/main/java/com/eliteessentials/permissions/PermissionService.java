@@ -87,6 +87,7 @@ public class PermissionService {
      */
     public boolean isAdmin(UUID playerId) {
         return hasPermission(playerId, Permissions.ADMIN) || 
+               hasPermission(playerId, Permissions.ADMIN_BASE) ||  // eliteessentials.admin (without wildcard)
                hasPermission(playerId, "hytale.command.op.*");
     }
     
@@ -96,6 +97,7 @@ public class PermissionService {
     public boolean isAdmin(CommandSender sender) {
         if (sender == null) return false;
         return sender.hasPermission(Permissions.ADMIN, false) ||
+               sender.hasPermission(Permissions.ADMIN_BASE, false) ||  // eliteessentials.admin (without wildcard)
                sender.hasPermission("hytale.command.op.*", false);
     }
 
@@ -240,6 +242,44 @@ public class PermissionService {
         return defaultMax;
     }
 
+    // ==================== HEAL COOLDOWN ====================
+
+    /**
+     * Get the heal cooldown for a player based on permissions.
+     * Checks for permission-based cooldowns like eliteessentials.command.misc.heal.cooldown.300
+     * 
+     * Priority:
+     * 1. Bypass permission (returns 0)
+     * 2. Permission-based cooldown (heal.cooldown.<seconds>)
+     * 3. Config default
+     * 
+     * Note: We check common cooldown values. Server admins should use standard
+     * values (30, 60, 120, 180, 300, 600, 900, 1800, 3600) for best compatibility.
+     */
+    public int getHealCooldown(UUID playerId) {
+        ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
+        int defaultCooldown = configManager.getConfig().heal.cooldownSeconds;
+        
+        // Check for bypass permission first
+        if (hasPermission(playerId, Permissions.HEAL_BYPASS_COOLDOWN)) {
+            return 0;
+        }
+        
+        // Check for specific cooldown permissions (common values in seconds)
+        // We check from lowest to highest and return the first match
+        // This way groups with lower cooldowns get priority
+        int[] commonCooldowns = {30, 60, 120, 180, 300, 600, 900, 1800, 3600};
+        
+        for (int cooldown : commonCooldowns) {
+            if (hasPermission(playerId, Permissions.healCooldown(cooldown))) {
+                return cooldown;
+            }
+        }
+        
+        // No specific cooldown permission found, return config default
+        return defaultCooldown;
+    }
+
     // ==================== WARP ACCESS ====================
 
     /**
@@ -247,22 +287,33 @@ public class PermissionService {
      * @param playerId Player UUID
      * @param warpName Warp name
      * @param warpPermission The warp's required permission enum (ALL or OP)
+     * 
+     * Permission logic:
+     * - Simple mode: ALL warps = everyone, OP warps = admins only
+     * - Advanced mode: Player needs warp.use (all public warps) OR warp.<name> (specific warp)
+     *   - OP warps still require admin permission
      */
     public boolean canAccessWarp(UUID playerId, String warpName, com.eliteessentials.model.Warp.Permission warpPermission) {
-        // ALL means everyone with base warp permission can access
-        if (warpPermission == com.eliteessentials.model.Warp.Permission.ALL) {
+        // Admins always have access
+        if (isAdmin(playerId)) {
             return true;
         }
         
-        // OP means only OPs/admins
+        // OP warps require admin permission
         if (warpPermission == com.eliteessentials.model.Warp.Permission.OP) {
-            return hasPermission(playerId, Permissions.ADMIN) || 
-                   hasPermission(playerId, Permissions.WARPADMIN);
+            return hasPermission(playerId, Permissions.WARPADMIN);
         }
         
-        // Fallback - check the specific warp permission
-        return hasPermission(playerId, Permissions.warpAccess(warpName)) ||
-               hasPermission(playerId, Permissions.ADMIN);
+        // For ALL warps:
+        // - Simple mode: everyone can access
+        // - Advanced mode: need warp.use OR warp.<name>
+        if (!isAdvancedMode()) {
+            return true;  // Simple mode - everyone can use ALL warps
+        }
+        
+        // Advanced mode - check warp.use (general access) OR warp.<name> (specific access)
+        return hasPermission(playerId, Permissions.WARP) || 
+               hasPermission(playerId, Permissions.warpAccess(warpName));
     }
 
     // ==================== DEFAULT PERMISSION SETUP ====================

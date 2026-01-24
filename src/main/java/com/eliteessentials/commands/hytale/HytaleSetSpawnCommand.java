@@ -63,8 +63,8 @@ public class HytaleSetSpawnCommand extends AbstractPlayerCommand {
         // Save spawn
         spawnStorage.setSpawn(world.getName(), pos.getX(), pos.getY(), pos.getZ(), rot.y, rot.x);
 
-        // Update spawn protection service
-        EliteEssentials.getInstance().getSpawnProtectionService().setSpawnLocation(pos.getX(), pos.getY(), pos.getZ());
+        // Update spawn protection service with world name
+        EliteEssentials.getInstance().getSpawnProtectionService().setSpawnLocation(world.getName(), pos.getX(), pos.getY(), pos.getZ());
 
         // NOTE: Respawn behavior is handled by RespawnListener system:
         // - Players with bed spawns will respawn at their bed (vanilla behavior)

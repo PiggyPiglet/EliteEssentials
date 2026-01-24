@@ -196,33 +196,17 @@ public class ConfigManager {
         PluginConfig defaults = new PluginConfig();
         JsonObject defaultJson = gson.toJsonTree(defaults).getAsJsonObject();
         
+        // Remove messages from both - they're handled separately in messages.json now
+        userJson.remove("messages");
+        defaultJson.remove("messages");
+        
         // Merge: defaults as base, user values override
         JsonObject merged = deepMerge(defaultJson, userJson);
         
         // Convert merged JSON back to PluginConfig
         PluginConfig mergedConfig = gson.fromJson(merged, PluginConfig.class);
         
-        // Count message keys to detect if new messages were added
-        int userMessageCount = 0;
-        int defaultMessageCount = 0;
-        if (userJson.has("messages") && userJson.get("messages").isJsonObject()) {
-            userMessageCount = userJson.getAsJsonObject("messages").size();
-        }
-        if (defaultJson.has("messages") && defaultJson.get("messages").isJsonObject()) {
-            defaultMessageCount = defaultJson.getAsJsonObject("messages").size();
-        }
-        
-        logger.info("Config messages: user has " + userMessageCount + ", defaults has " + defaultMessageCount);
-        
-        // Force save if message count differs (new messages added)
-        if (defaultMessageCount > userMessageCount) {
-            logger.info("New message keys detected! Updating config with " + (defaultMessageCount - userMessageCount) + " new messages...");
-            config = mergedConfig;
-            saveConfig();
-            return mergedConfig;
-        }
-        
-        // Check if merge added any other new fields
+        // Check if merge added any new fields (excluding messages)
         String userJsonStr = gson.toJson(userJson);
         String mergedJsonStr = gson.toJson(merged);
         
@@ -322,9 +306,15 @@ public class ConfigManager {
         
         File configFile = new File(dataFolder, "config.json");
         
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(configFile), StandardCharsets.UTF_8)) {
-            gson.toJson(config, writer);
-            logger.info("Configuration saved to: " + configFile.getAbsolutePath());
+        try {
+            // Convert config to JSON, then remove messages before saving
+            JsonObject configJson = gson.toJsonTree(config).getAsJsonObject();
+            configJson.remove("messages"); // Messages are stored in messages.json
+            
+            try (Writer writer = new OutputStreamWriter(new FileOutputStream(configFile), StandardCharsets.UTF_8)) {
+                gson.toJson(configJson, writer);
+                logger.info("Configuration saved to: " + configFile.getAbsolutePath());
+            }
         } catch (Exception e) {
             logger.severe("Failed to save config.json: " + e.getMessage());
         }
@@ -430,8 +420,8 @@ public class ConfigManager {
     public java.util.List<ConfigValidationResult> validateAllFiles() {
         java.util.List<ConfigValidationResult> errors = new java.util.ArrayList<>();
         
-        // List of all JSON files that get reloaded
-        String[] files = {
+        // List of all JSON files in our plugin folder
+        String[] pluginFiles = {
             "config.json",
             "messages.json",
             "motd.json",
@@ -441,10 +431,13 @@ public class ConfigManager {
             "spawn.json",
             "kits.json",
             "kit_claims.json",
-            "aliases.json"
+            "aliases.json",
+            "players.json",
+            "homes.json",
+            "first_join.json"
         };
         
-        for (String filename : files) {
+        for (String filename : pluginFiles) {
             File file = new File(dataFolder, filename);
             if (file.exists()) {
                 ConfigValidationResult result = validateJsonFile(file, filename);

@@ -1,7 +1,8 @@
 package com.eliteessentials.services;
 
 import com.eliteessentials.EliteEssentials;
-import com.eliteessentials.model.Warp;
+import com.eliteessentials.commands.hytale.HytaleHomeCommand;
+import com.eliteessentials.commands.hytale.HytaleWarpCommand;
 import com.eliteessentials.storage.AliasStorage;
 import com.eliteessentials.storage.AliasStorage.AliasData;
 import com.eliteessentials.storage.SpawnStorage;
@@ -96,76 +97,243 @@ public class AliasService {
                 return;
             }
             boolean backSaved = false;
+            boolean silent = data.silent;
             for (String cmd : data.command.split(";")) {
                 cmd = cmd.trim(); if (cmd.isEmpty()) continue; if (cmd.startsWith("/")) cmd = cmd.substring(1);
                 String[] p = cmd.split(" ", 2); String cn = p[0].toLowerCase(); String args = p.length > 1 ? p[1].trim() : "";
                 if (!backSaved && (cn.equals("warp") || cn.equals("spawn") || cn.equals("home"))) { saveBack(store, ref, player, world); backSaved = true; }
-                runCmd(ctx, store, ref, player, world, cn, args);
+                runCmd(ctx, store, ref, player, world, cn, args, silent);
             }
         }
 
-        private void runCmd(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world, String cn, String args) {
+        private void runCmd(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world, String cn, String args, boolean silent) {
             try {
                 switch (cn) {
-                    case "warp": doWarp(ctx, store, ref, args); break;
-                    case "spawn": doSpawn(ctx, store, ref, world); break;
-                    case "home": doHome(ctx, store, ref, player, args); break;
-                    case "heal": doHeal(ctx, store, ref); break;
-                    case "god": doGod(ctx, store, ref, player); break;
-                    case "fly": doFly(ctx, store, ref, player); break;
+                    case "warp": doWarp(ctx, store, ref, player, world, args, silent); break;
+                    case "spawn": doSpawn(ctx, store, ref, player, world, silent); break;
+                    case "home": doHome(ctx, store, ref, player, world, args, silent); break;
+                    case "heal": doHeal(ctx, store, ref, player, silent); break;
+                    case "god": doGod(ctx, store, ref, player, silent); break;
+                    case "fly": doFly(ctx, store, ref, player, silent); break;
+                    case "rules": doRules(player); break;
+                    case "motd": doMotd(player, world); break;
+                    case "discord": doDiscord(player); break;
                     default: ctx.sendMessage(Message.raw("Unknown: " + cn).color("#FF5555"));
                 }
             } catch (Exception e) { logger.warning("[Alias] " + cn + ": " + e.getMessage()); }
         }
 
-        private void doWarp(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, String n) {
+        private void doWarp(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world, String n, boolean silent) {
             if (n.isEmpty()) return;
-            Optional<Warp> o = EliteEssentials.getInstance().getWarpService().getWarp(n);
-            if (o.isEmpty()) { ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("warpNotFound", "name", n, "list", ""), "#FF5555")); return; }
-            Warp w = o.get();
-            World targetWorld = Universe.get().getWorld(w.getLocation().getWorld());
-            if (targetWorld == null) { ctx.sendMessage(MessageFormatter.formatWithFallback("&cWorld not found: " + w.getLocation().getWorld(), "#FF5555")); return; }
-            store.putComponent(ref, Teleport.getComponentType(), new Teleport(targetWorld, new Vector3d(w.getLocation().getX(), w.getLocation().getY(), w.getLocation().getZ()), new Vector3f(0, w.getLocation().getYaw(), 0)));
-            ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("warpTeleported", "name", n), "#55FF55"));
+            
+            // Use the real warp command's goToWarp method which handles warmup/cooldown
+            WarpService warpService = EliteEssentials.getInstance().getWarpService();
+            BackService backService = EliteEssentials.getInstance().getBackService();
+            HytaleWarpCommand.goToWarp(ctx, store, ref, player, world, n, warpService, backService, silent);
         }
 
-        private void doSpawn(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, World world) {
-            var config = EliteEssentials.getInstance().getConfigManager().getConfig();
+        private void doSpawn(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world, boolean silent) {
+            // Use the real spawn command logic which handles warmup/cooldown
+            var backService = EliteEssentials.getInstance().getBackService();
+            var cooldownService = EliteEssentials.getInstance().getCooldownService();
+            var warmupService = EliteEssentials.getInstance().getWarmupService();
+            var configManager = EliteEssentials.getInstance().getConfigManager();
+            var config = configManager.getConfig();
+            var spawnStorage = EliteEssentials.getInstance().getSpawnStorage();
+            UUID playerId = player.getUuid();
+            
+            // Check permission (always show error even if silent)
+            if (!PermissionService.get().canUseEveryoneCommand(playerId, com.eliteessentials.permissions.Permissions.SPAWN, config.spawn.enabled)) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
+                return;
+            }
+            
+            // Check cooldown (with bypass check)
+            if (!com.eliteessentials.util.CommandPermissionUtil.canBypassCooldown(playerId, "spawn")) {
+                int cooldownRemaining = cooldownService.getCooldownRemaining("spawn", playerId);
+                if (cooldownRemaining > 0) {
+                    ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("onCooldown", "seconds", String.valueOf(cooldownRemaining)), "#FF5555"));
+                    return;
+                }
+            }
+            
+            // Check if already warming up
+            if (warmupService.hasActiveWarmup(playerId)) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("teleportInProgress"), "#FF5555"));
+                return;
+            }
+            
             String targetWorldName = config.spawn.perWorld ? world.getName() : config.spawn.mainWorld;
-            SpawnStorage.SpawnData s = EliteEssentials.getInstance().getSpawnStorage().getSpawn(targetWorldName);
-            if (s == null) { ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("spawnNoSpawn"), "#FF5555")); return; }
+            SpawnStorage.SpawnData s = spawnStorage.getSpawn(targetWorldName);
+            if (s == null) { 
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnNoSpawn"), "#FF5555")); 
+                return; 
+            }
+            
+            // Get current position for warmup and /back
+            TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+            if (transform == null) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("couldNotGetPosition"), "#FF5555"));
+                return;
+            }
+            
+            Vector3d currentPos = transform.getPosition();
+            HeadRotation headRotation = store.getComponent(ref, HeadRotation.getComponentType());
+            Vector3f rotation = headRotation != null ? headRotation.getRotation() : new Vector3f(0, 0, 0);
+            
+            com.eliteessentials.model.Location currentLoc = new com.eliteessentials.model.Location(
+                world.getName(),
+                currentPos.getX(), currentPos.getY(), currentPos.getZ(),
+                rotation.y, rotation.x
+            );
+            
             World targetWorld = Universe.get().getWorld(targetWorldName);
             if (targetWorld == null) targetWorld = world;
-            store.putComponent(ref, Teleport.getComponentType(), new Teleport(targetWorld, new Vector3d(s.x, s.y, s.z), new Vector3f(0, s.yaw, 0)));
-            ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("spawnTeleported"), "#55FF55"));
+            final World finalTargetWorld = targetWorld;
+            final boolean finalSilent = silent;
+            
+            Vector3d spawnPos = new Vector3d(s.x, s.y, s.z);
+            Vector3f spawnRot = new Vector3f(0, s.yaw, 0);
+            
+            Runnable doTeleport = () -> {
+                backService.pushLocation(playerId, currentLoc);
+                world.execute(() -> {
+                    if (!ref.isValid()) return;
+                    store.putComponent(ref, Teleport.getComponentType(), new Teleport(finalTargetWorld, spawnPos, spawnRot));
+                    // Only suppress success message when silent
+                    if (!finalSilent) {
+                        ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnTeleported"), "#55FF55"));
+                    }
+                });
+                cooldownService.setCooldown("spawn", playerId, config.spawn.cooldownSeconds);
+            };
+            
+            int warmupSeconds = com.eliteessentials.util.CommandPermissionUtil.getEffectiveWarmup(playerId, "spawn", config.spawn.warmupSeconds);
+            // Only suppress warmup message when silent
+            if (warmupSeconds > 0 && !silent) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnWarmup", "seconds", String.valueOf(warmupSeconds)), "#FFAA00"));
+            }
+            // Pass false for warmup silent - we want countdown messages to show
+            warmupService.startWarmup(player, currentPos, warmupSeconds, doTeleport, "spawn", world, store, ref, false);
         }
 
-        private void doHome(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, String n) {
+        private void doHome(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world, String n, boolean silent) {
             if (n.isEmpty()) n = "home";
-            var o = EliteEssentials.getInstance().getHomeService().getHome(player.getUuid(), n);
-            if (o.isEmpty()) { ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("homeNotFound", "name", n), "#FF5555")); return; }
-            var h = o.get();
-            store.putComponent(ref, Teleport.getComponentType(), new Teleport(new Vector3d(h.getLocation().getX(), h.getLocation().getY(), h.getLocation().getZ()), new Vector3f(0, h.getLocation().getYaw(), 0)));
-            ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("homeTeleported", "name", n), "#55FF55"));
+            
+            // Use the real home command's goHome method which handles warmup/cooldown
+            var homeService = EliteEssentials.getInstance().getHomeService();
+            var backService = EliteEssentials.getInstance().getBackService();
+            HytaleHomeCommand.goHome(ctx, store, ref, player, world, n, homeService, backService, silent);
         }
 
-        private void doHeal(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref) {
+        private void doHeal(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, boolean silent) {
+            var configManager = EliteEssentials.getInstance().getConfigManager();
+            var config = configManager.getConfig();
+            UUID playerId = player.getUuid();
+            
+            // Check permission (always show error even if silent)
+            if (!PermissionService.get().canUseEveryoneCommand(playerId, com.eliteessentials.permissions.Permissions.HEAL, config.heal.enabled)) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
+                return;
+            }
+            
             EntityStatMap m = store.getComponent(ref, EntityStatMap.getComponentType());
-            if (m != null) { m.maximizeStatValue(DefaultEntityStatTypes.getHealth()); ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("healSuccess"), "#55FF55")); }
+            if (m != null) { 
+                m.maximizeStatValue(DefaultEntityStatTypes.getHealth()); 
+                if (!silent) {
+                    ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("healSuccess"), "#55FF55")); 
+                }
+            }
         }
 
-        private void doGod(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player) {
+        private void doGod(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, boolean silent) {
+            var configManager = EliteEssentials.getInstance().getConfigManager();
+            var config = configManager.getConfig();
+            UUID playerId = player.getUuid();
+            
+            // Check permission (always show error even if silent)
+            if (!PermissionService.get().canUseEveryoneCommand(playerId, com.eliteessentials.permissions.Permissions.GOD, config.god.enabled)) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
+                return;
+            }
+            
             GodService gs = EliteEssentials.getInstance().getGodService();
-            boolean on = gs.toggleGodMode(player.getUuid());
-            if (on) { store.putComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE); ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("godEnabled"), "#55FF55")); }
-            else { store.removeComponent(ref, Invulnerable.getComponentType()); ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("godDisabled"), "#FF5555")); }
+            boolean on = gs.toggleGodMode(playerId);
+            if (on) { 
+                store.putComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE); 
+                if (!silent) {
+                    ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godEnabled"), "#55FF55")); 
+                }
+            }
+            else { 
+                store.removeComponent(ref, Invulnerable.getComponentType()); 
+                if (!silent) {
+                    ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godDisabled"), "#FF5555")); 
+                }
+            }
         }
 
-        private void doFly(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player) {
+        private void doFly(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, boolean silent) {
+            var configManager = EliteEssentials.getInstance().getConfigManager();
+            var config = configManager.getConfig();
+            UUID playerId = player.getUuid();
+            
+            // Check permission (always show error even if silent)
+            if (!PermissionService.get().canUseEveryoneCommand(playerId, com.eliteessentials.permissions.Permissions.FLY, config.fly.enabled)) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("noPermission"), "#FF5555"));
+                return;
+            }
+            
             MovementManager mm = store.getComponent(ref, MovementManager.getComponentType());
             if (mm == null) return;
             var s = mm.getSettings(); s.canFly = !s.canFly; mm.update(player.getPacketHandler());
-            ctx.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage(s.canFly ? "flyEnabled" : "flyDisabled"), s.canFly ? "#55FF55" : "#FF5555"));
+            if (!silent) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage(s.canFly ? "flyEnabled" : "flyDisabled"), s.canFly ? "#55FF55" : "#FF5555"));
+            }
+        }
+
+        private void doRules(PlayerRef player) {
+            var rulesStorage = EliteEssentials.getInstance().getRulesStorage();
+            var lines = rulesStorage.getRulesLines();
+            if (lines.isEmpty()) {
+                player.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("rulesEmpty"), "#FF5555"));
+                return;
+            }
+            for (String line : lines) {
+                if (!line.trim().isEmpty()) player.sendMessage(MessageFormatter.format(line));
+            }
+        }
+
+        private void doMotd(PlayerRef player, World world) {
+            var motdStorage = EliteEssentials.getInstance().getMotdStorage();
+            var config = EliteEssentials.getInstance().getConfigManager().getConfig();
+            var lines = motdStorage.getMotdLines();
+            if (lines.isEmpty()) {
+                player.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("motdEmpty"), "#FF5555"));
+                return;
+            }
+            int playerCount = Universe.get().getPlayers().size();
+            for (String line : lines) {
+                if (!line.trim().isEmpty()) {
+                    String processed = line.replace("{player}", player.getUsername())
+                            .replace("{server}", config.motd.serverName)
+                            .replace("{world}", world.getName())
+                            .replace("{playercount}", String.valueOf(playerCount));
+                    player.sendMessage(MessageFormatter.format(processed));
+                }
+            }
+        }
+
+        private void doDiscord(PlayerRef player) {
+            var discordStorage = EliteEssentials.getInstance().getDiscordStorage();
+            var lines = discordStorage.getDiscordLines();
+            if (lines.isEmpty()) {
+                player.sendMessage(MessageFormatter.formatWithFallback(EliteEssentials.getInstance().getConfigManager().getMessage("discordEmpty"), "#FF5555"));
+                return;
+            }
+            for (String line : lines) {
+                if (!line.trim().isEmpty()) player.sendMessage(MessageFormatter.format(line));
+            }
         }
 
         private void saveBack(Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world) {

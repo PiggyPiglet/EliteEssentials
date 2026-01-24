@@ -133,16 +133,28 @@ public class HytaleTphereCommand extends AbstractPlayerCommand {
         
         // Create teleport with admin's position and rotation (pitch=0 for upright landing)
         Vector3f targetRotation = new Vector3f(0.0f, adminRot.y, 0.0f);
-        Teleport teleport = new Teleport(world, adminPos, targetRotation);
         
-        // Use putComponent for creative mode compatibility
-        targetStore.putComponent(targetRef, Teleport.getComponentType(), teleport);
+        // CRITICAL: Execute teleport on target's world thread to avoid IllegalStateException
+        // Get target's world for thread-safe execution
+        EntityStore targetEntityStore = targetStore.getExternalData();
+        World targetWorld = targetEntityStore != null ? targetEntityStore.getWorld() : world;
+        final World finalTargetWorld = targetWorld != null ? targetWorld : world;
         
-        // Send messages
+        finalTargetWorld.execute(() -> {
+            if (!targetRef.isValid()) return;
+            
+            Teleport teleport = new Teleport(world, adminPos, targetRotation);
+            // Use putComponent for creative mode compatibility
+            targetStore.putComponent(targetRef, Teleport.getComponentType(), teleport);
+            
+            // Send message to target
+            target.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tphereTeleported", 
+                "player", player.getUsername()), "#FFFF55"));
+        });
+        
+        // Send message to admin (we're on admin's world thread, so this is safe)
         ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tphereSuccess", 
             "player", target.getUsername()), "#55FF55"));
-        target.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tphereTeleported", 
-            "player", player.getUsername()), "#FFFF55"));
     }
     
     /**

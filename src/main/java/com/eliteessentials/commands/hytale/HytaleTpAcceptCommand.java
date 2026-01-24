@@ -148,21 +148,27 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         );
 
         // Define the teleport action based on request type
+        // CRITICAL: Must execute store operations on the correct world thread to avoid IllegalStateException
         Runnable doTeleport = () -> {
             if (request.getType() == TpaRequest.Type.TPA) {
                 // Regular TPA: Requester teleports to target (acceptor)
                 backService.pushLocation(request.getRequesterId(), requesterLoc);
                 
-                // Get target's yaw to face the same direction
+                // Get target's yaw to face the same direction (safe - we're on acceptor's world thread)
                 HeadRotation targetHeadRot = (HeadRotation) store.getComponent(ref, HeadRotation.getComponentType());
                 float targetYaw = targetHeadRot != null ? targetHeadRot.getRotation().y : 0;
                 
-                // Always use pitch=0 to keep player upright
-                Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, targetYaw, 0));
-                requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
-                logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
-                
-                requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername()), "#55FF55"));
+                // Execute teleport on requester's world thread (may be different from acceptor's world)
+                finalRequesterWorld.execute(() -> {
+                    if (!requesterRef.isValid()) return;
+                    
+                    // Always use pitch=0 to keep player upright
+                    Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, targetYaw, 0));
+                    requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
+                    logger.fine("[TPA] Teleport component added for " + request.getRequesterName());
+                    
+                    requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername()), "#55FF55"));
+                });
             } else {
                 // TPAHERE: Target (acceptor) teleports to requester
                 HeadRotation targetHeadRot = (HeadRotation) store.getComponent(ref, HeadRotation.getComponentType());
@@ -178,12 +184,17 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
                 // Get requester's yaw to face the same direction
                 float requesterYaw = reqRot.y;
                 
-                // Always use pitch=0 to keep player upright
-                Teleport teleport = new Teleport(finalRequesterWorld, requesterPos, new Vector3f(0, requesterYaw, 0));
-                store.putComponent(ref, Teleport.getComponentType(), teleport);
-                logger.fine("[TPAHERE] Teleport component added for " + player.getUsername());
-                
-                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpahereAcceptedTarget", "player", request.getRequesterName()), "#55FF55"));
+                // Execute teleport on acceptor's world thread (we're already on it)
+                world.execute(() -> {
+                    if (!ref.isValid()) return;
+                    
+                    // Always use pitch=0 to keep player upright
+                    Teleport teleport = new Teleport(finalRequesterWorld, requesterPos, new Vector3f(0, requesterYaw, 0));
+                    store.putComponent(ref, Teleport.getComponentType(), teleport);
+                    logger.fine("[TPAHERE] Teleport component added for " + player.getUsername());
+                    
+                    ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpahereAcceptedTarget", "player", request.getRequesterName()), "#55FF55"));
+                });
                 requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpahereAcceptedRequester", "player", player.getUsername()), "#55FF55"));
             }
         };
