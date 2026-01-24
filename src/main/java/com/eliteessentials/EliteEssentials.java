@@ -372,28 +372,24 @@ public class EliteEssentials extends JavaPlugin {
             getLogger().at(Level.INFO).log("Registered /warp command");
         } catch (Exception e) {
             getLogger().at(Level.SEVERE).log("Failed to register /warp: " + e.getMessage());
-            e.printStackTrace();
         }
         try {
             getCommandRegistry().registerCommand(new HytaleWarpAdminCommand(warpService));
             getLogger().at(Level.INFO).log("Registered /warpadmin command");
         } catch (Exception e) {
             getLogger().at(Level.SEVERE).log("Failed to register /warpadmin: " + e.getMessage());
-            e.printStackTrace();
         }
         try {
             getCommandRegistry().registerCommand(new HytaleWarpSetPermCommand(warpService));
             getLogger().at(Level.INFO).log("Registered /warpsetperm command");
         } catch (Exception e) {
             getLogger().at(Level.SEVERE).log("Failed to register /warpsetperm: " + e.getMessage());
-            e.printStackTrace();
         }
         try {
             getCommandRegistry().registerCommand(new HytaleWarpSetDescCommand(warpService));
             getLogger().at(Level.INFO).log("Registered /warpsetdesc command");
         } catch (Exception e) {
             getLogger().at(Level.SEVERE).log("Failed to register /warpsetdesc: " + e.getMessage());
-            e.printStackTrace();
         }
         
         // Admin commands (OP only)

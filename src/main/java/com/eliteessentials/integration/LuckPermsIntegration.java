@@ -464,7 +464,6 @@ public class LuckPermsIntegration {
             
         } catch (Exception e) {
             logger.warning("[LuckPerms] Error getting groups: " + e.getMessage());
-            e.printStackTrace();
         }
         
         return groups;

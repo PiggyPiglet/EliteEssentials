@@ -96,7 +96,7 @@ public class HytaleBroadcastCommand extends CommandBase {
             }
         } catch (Exception e) {
             // Log error if broadcast fails
-            System.err.println("Could not broadcast message: " + e.getMessage());
+            java.util.logging.Logger.getLogger("EliteEssentials").warning("Could not broadcast message: " + e.getMessage());
         }
     }
 }

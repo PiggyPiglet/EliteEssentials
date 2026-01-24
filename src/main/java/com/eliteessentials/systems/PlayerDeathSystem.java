@@ -102,7 +102,6 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
             
         } catch (Exception e) {
             logger.warning("[PlayerDeathSystem] Error: " + e.getMessage());
-            e.printStackTrace();
         }
     }
     

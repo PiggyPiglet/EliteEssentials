@@ -26,7 +26,6 @@ public class DamageTrackingSystem extends RefChangeSystem<EntityStore, DeathComp
 
     public DamageTrackingSystem(DamageTrackingService damageTrackingService) {
         this.damageTrackingService = damageTrackingService;
-        logger.info("[DamageTracking] DamageTrackingSystem initialized (placeholder)");
     }
 
     @Override
