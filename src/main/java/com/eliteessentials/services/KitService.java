@@ -1,6 +1,8 @@
 package com.eliteessentials.services;
 
 import com.eliteessentials.model.Kit;
+import com.eliteessentials.model.PlayerFile;
+import com.eliteessentials.storage.PlayerFileStorage;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -9,11 +11,12 @@ import java.io.*;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
  * Service for managing kits - loading, saving, and cooldown tracking.
+ * Kit definitions are stored in kits.json (server-wide).
+ * Kit claims and cooldowns are stored in per-player files via PlayerFileStorage.
  */
 public class KitService {
 
@@ -22,10 +25,7 @@ public class KitService {
 
     private final File dataFolder;
     private final Map<String, Kit> kits = new LinkedHashMap<>();
-    // Player UUID -> Kit ID -> Last use timestamp
-    private final Map<UUID, Map<String, Long>> cooldowns = new ConcurrentHashMap<>();
-    // Player UUID -> Kit ID -> true if claimed (for onetime kits)
-    private final Map<UUID, Set<String>> onetimeClaimed = new ConcurrentHashMap<>();
+    private PlayerFileStorage playerFileStorage;
     
     // Lock for file I/O operations to prevent concurrent writes
     private final Object fileLock = new Object();
@@ -33,7 +33,13 @@ public class KitService {
     public KitService(File dataFolder) {
         this.dataFolder = dataFolder;
         loadKits();
-        loadOnetimeClaims();
+    }
+    
+    /**
+     * Set the player file storage (called after initialization).
+     */
+    public void setPlayerFileStorage(PlayerFileStorage storage) {
+        this.playerFileStorage = storage;
     }
 
     /**
@@ -136,13 +142,17 @@ public class KitService {
             return 0;
         }
 
-        Map<String, Long> playerCooldowns = cooldowns.get(playerId);
-        if (playerCooldowns == null) {
+        if (playerFileStorage == null) {
+            return 0;
+        }
+        
+        PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+        if (playerFile == null) {
             return 0;
         }
 
-        Long lastUsed = playerCooldowns.get(kitId.toLowerCase());
-        if (lastUsed == null) {
+        long lastUsed = playerFile.getKitLastUsed(kitId);
+        if (lastUsed == 0) {
             return 0;
         }
 
@@ -155,15 +165,26 @@ public class KitService {
      * Set cooldown for a player's kit usage
      */
     public void setKitUsed(UUID playerId, String kitId) {
-        cooldowns.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>())
-                 .put(kitId.toLowerCase(), System.currentTimeMillis());
+        if (playerFileStorage == null) return;
+        
+        PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+        if (playerFile == null) return;
+        
+        playerFile.setKitUsed(kitId);
+        playerFileStorage.saveAndMarkDirty(playerId);
     }
 
     /**
      * Clear cooldowns for a player (on disconnect or admin command)
      */
     public void clearCooldowns(UUID playerId) {
-        cooldowns.remove(playerId);
+        if (playerFileStorage == null) return;
+        
+        PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+        if (playerFile == null) return;
+        
+        playerFile.clearKitCooldowns();
+        playerFileStorage.saveAndMarkDirty(playerId);
     }
 
     /**
@@ -171,22 +192,26 @@ public class KitService {
      */
     public void reload() {
         loadKits();
-        loadOnetimeClaims();
     }
 
     /**
      * Check if player has already claimed a one-time kit
      */
     public boolean hasClaimedOnetime(UUID playerId, String kitId) {
-        Set<String> claimed = onetimeClaimed.get(playerId);
-        boolean hasClaimed = claimed != null && claimed.contains(kitId.toLowerCase());
-        // Only log if debug is enabled - need to get config from EliteEssentials instance
+        if (playerFileStorage == null) return false;
+        
+        PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+        if (playerFile == null) return false;
+        
+        boolean hasClaimed = playerFile.hasClaimedKit(kitId);
+        
+        // Only log if debug is enabled
         if (hasClaimed) {
             try {
                 com.eliteessentials.EliteEssentials plugin = com.eliteessentials.EliteEssentials.getInstance();
                 if (plugin != null && plugin.getConfigManager().isDebugEnabled()) {
                     logger.info("hasClaimedOnetime check: playerId=" + playerId + ", kitId=" + kitId + 
-                               ", claimed=" + hasClaimed + ", claimedSet=" + claimed);
+                               ", claimed=" + hasClaimed);
                 }
             } catch (Exception e) {
                 // Ignore if we can't get config
@@ -199,6 +224,8 @@ public class KitService {
      * Mark a one-time kit as claimed
      */
     public void setOnetimeClaimed(UUID playerId, String kitId) {
+        if (playerFileStorage == null) return;
+        
         try {
             com.eliteessentials.EliteEssentials plugin = com.eliteessentials.EliteEssentials.getInstance();
             if (plugin != null && plugin.getConfigManager().isDebugEnabled()) {
@@ -208,19 +235,20 @@ public class KitService {
             // Ignore if we can't get config
         }
         
-        onetimeClaimed.computeIfAbsent(playerId, k -> ConcurrentHashMap.newKeySet())
-                      .add(kitId.toLowerCase());
+        PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+        if (playerFile == null) return;
+        
+        playerFile.claimKit(kitId);
+        playerFileStorage.saveAndMarkDirty(playerId);
         
         try {
             com.eliteessentials.EliteEssentials plugin = com.eliteessentials.EliteEssentials.getInstance();
             if (plugin != null && plugin.getConfigManager().isDebugEnabled()) {
-                logger.info("After adding, onetimeClaimed for player: " + onetimeClaimed.get(playerId));
+                logger.info("After adding, kitClaims for player: " + playerFile.getKitClaims());
             }
         } catch (Exception e) {
             // Ignore if we can't get config
         }
-        
-        saveOnetimeClaims();
     }
 
     /**
@@ -235,63 +263,5 @@ public class KitService {
             }
         }
         return starters;
-    }
-
-    /**
-     * Load one-time kit claims from file
-     */
-    private void loadOnetimeClaims() {
-        File claimsFile = new File(dataFolder, "kit_claims.json");
-        
-        if (!claimsFile.exists()) {
-            return;
-        }
-
-        try (Reader reader = new InputStreamReader(new FileInputStream(claimsFile), StandardCharsets.UTF_8)) {
-            Type mapType = new TypeToken<Map<String, List<String>>>(){}.getType();
-            Map<String, List<String>> loadedClaims = gson.fromJson(reader, mapType);
-            
-            onetimeClaimed.clear();
-            if (loadedClaims != null) {
-                for (Map.Entry<String, List<String>> entry : loadedClaims.entrySet()) {
-                    try {
-                        UUID playerId = UUID.fromString(entry.getKey());
-                        Set<String> kitIds = ConcurrentHashMap.newKeySet();
-                        kitIds.addAll(entry.getValue());
-                        onetimeClaimed.put(playerId, kitIds);
-                    } catch (IllegalArgumentException e) {
-                        logger.warning("Invalid UUID in kit_claims.json: " + entry.getKey());
-                    }
-                }
-            }
-            logger.info("Loaded one-time kit claims for " + onetimeClaimed.size() + " players");
-        } catch (Exception e) {
-            logger.severe("Failed to load kit_claims.json: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Save one-time kit claims to file
-     */
-    private void saveOnetimeClaims() {
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs();
-        }
-
-        File claimsFile = new File(dataFolder, "kit_claims.json");
-        
-        // Convert to serializable format (UUID -> String)
-        Map<String, List<String>> serializableClaims = new LinkedHashMap<>();
-        for (Map.Entry<UUID, Set<String>> entry : onetimeClaimed.entrySet()) {
-            serializableClaims.put(entry.getKey().toString(), new ArrayList<>(entry.getValue()));
-        }
-        
-        synchronized (fileLock) {
-            try (Writer writer = new OutputStreamWriter(new FileOutputStream(claimsFile), StandardCharsets.UTF_8)) {
-                gson.toJson(serializableClaims, writer);
-            } catch (Exception e) {
-                logger.severe("Failed to save kit_claims.json: " + e.getMessage());
-            }
-        }
     }
 }

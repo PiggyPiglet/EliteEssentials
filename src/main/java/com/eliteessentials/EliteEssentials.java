@@ -14,6 +14,7 @@ import com.eliteessentials.services.BackService;
 import com.eliteessentials.services.CooldownService;
 import com.eliteessentials.services.CostService;
 import com.eliteessentials.services.DamageTrackingService;
+import com.eliteessentials.services.DataMigrationService;
 import com.eliteessentials.services.DeathTrackingService;
 import com.eliteessentials.services.GodService;
 import com.eliteessentials.services.HomeService;
@@ -27,11 +28,9 @@ import com.eliteessentials.services.SpawnProtectionService;
 import com.eliteessentials.services.TpaService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.services.WarpService;
-import com.eliteessentials.storage.BackStorage;
 import com.eliteessentials.storage.DiscordStorage;
-import com.eliteessentials.storage.HomeStorage;
 import com.eliteessentials.storage.MotdStorage;
-import com.eliteessentials.storage.PlayerStorage;
+import com.eliteessentials.storage.PlayerFileStorage;
 import com.eliteessentials.storage.PlayTimeRewardStorage;
 import com.eliteessentials.storage.RulesStorage;
 import com.eliteessentials.storage.SpawnStorage;
@@ -62,14 +61,12 @@ public class EliteEssentials extends JavaPlugin {
     private static final Logger logger = Logger.getLogger("EliteEssentials");
     
     private ConfigManager configManager;
-    private HomeStorage homeStorage;
-    private BackStorage backStorage;
+    private PlayerFileStorage playerFileStorage;
     private WarpStorage warpStorage;
     private SpawnStorage spawnStorage;
     private MotdStorage motdStorage;
     private RulesStorage rulesStorage;
     private DiscordStorage discordStorage;
-    private PlayerStorage playerStorage;
     private HomeService homeService;
     private BackService backService;
     private TpaService tpaService;
@@ -129,13 +126,19 @@ public class EliteEssentials extends JavaPlugin {
         configManager = new ConfigManager(this.dataFolder);
         configManager.loadConfig();
         
-        // Initialize storage
-        homeStorage = new HomeStorage(this.dataFolder);
-        homeStorage.load();
+        // Initialize per-player file storage (new system)
+        playerFileStorage = new PlayerFileStorage(this.dataFolder);
         
-        backStorage = new BackStorage(this.dataFolder);
-        backStorage.load();
+        // Run migration from old monolithic files to per-player files
+        DataMigrationService migrationService = new DataMigrationService(this.dataFolder, playerFileStorage);
+        if (migrationService.needsMigration()) {
+            getLogger().at(Level.INFO).log("Detected old data files, running migration...");
+            if (!migrationService.migrate()) {
+                getLogger().at(Level.SEVERE).log("Migration failed! Check logs for details.");
+            }
+        }
         
+        // Initialize server-wide storage (not per-player)
         warpStorage = new WarpStorage(this.dataFolder);
         warpStorage.load();
         
@@ -151,14 +154,11 @@ public class EliteEssentials extends JavaPlugin {
         discordStorage = new DiscordStorage(this.dataFolder);
         discordStorage.load();
         
-        playerStorage = new PlayerStorage(this.dataFolder);
-        playerStorage.load();
-        
-        // Initialize services
+        // Initialize services (now using PlayerFileStorage)
         cooldownService = new CooldownService();
         warmupService = new WarmupService();
-        homeService = new HomeService(homeStorage);
-        backService = new BackService(configManager, backStorage);
+        homeService = new HomeService(playerFileStorage);
+        backService = new BackService(configManager, playerFileStorage);
         warpService = new WarpService(warpStorage);
         warpService.setConfigManager(configManager);
         damageTrackingService = new DamageTrackingService();
@@ -169,16 +169,18 @@ public class EliteEssentials extends JavaPlugin {
         godService = new GodService();
         messageService = new MessageService();
         kitService = new KitService(this.dataFolder);
+        kitService.setPlayerFileStorage(playerFileStorage);
         spawnProtectionService = new SpawnProtectionService(configManager);
         autoBroadcastService = new AutoBroadcastService(this.dataFolder);
         aliasService = new AliasService(this.dataFolder, getCommandRegistry());
-        playerService = new PlayerService(playerStorage, configManager);
+        playerService = new PlayerService(playerFileStorage, configManager);
         costService = new CostService(configManager);
         
         // Initialize playtime rewards
         playTimeRewardStorage = new PlayTimeRewardStorage(this.dataFolder);
         playTimeRewardStorage.load();
         playTimeRewardService = new PlayTimeRewardService(playTimeRewardStorage, playerService, configManager);
+        playTimeRewardService.setPlayerFileStorage(playerFileStorage);
         
         getLogger().at(Level.INFO).log("EliteEssentials setup complete.");
     }
@@ -194,12 +196,14 @@ public class EliteEssentials extends JavaPlugin {
         LuckPermsIntegration.registerPermissions();
         
         // Register starter kit event for new players
-        starterKitEvent = new StarterKitEvent(kitService, this.dataFolder);
+        starterKitEvent = new StarterKitEvent(kitService);
+        starterKitEvent.setPlayerFileStorage(playerFileStorage);
         starterKitEvent.registerEvents(getEventRegistry());
         getLogger().at(Level.INFO).log("Starter kit system registered.");
         
         // Register join/quit listener for join/quit messages, first join, and MOTD
-        joinQuitListener = new JoinQuitListener(configManager, motdStorage, playerService, this.dataFolder);
+        joinQuitListener = new JoinQuitListener(configManager, motdStorage, playerService);
+        joinQuitListener.setPlayerFileStorage(playerFileStorage);
         joinQuitListener.registerEvents(getEventRegistry());
         getLogger().at(Level.INFO).log("Join/Quit listener registered.");
         
@@ -311,15 +315,10 @@ public class EliteEssentials extends JavaPlugin {
             }
         }
         
-        // Save all data
-        if (homeStorage != null) {
-            homeStorage.save();
-            getLogger().at(Level.INFO).log("Homes saved.");
-        }
-        
-        if (backService != null) {
-            backService.save();
-            getLogger().at(Level.INFO).log("Back locations saved.");
+        // Save all player data (homes, back locations, etc. are now in player files)
+        if (playerFileStorage != null) {
+            playerFileStorage.saveAll();
+            getLogger().at(Level.INFO).log("Player data saved.");
         }
         
         if (warpService != null) {
@@ -348,12 +347,6 @@ public class EliteEssentials extends JavaPlugin {
         }
         if (playTimeRewardService != null) {
             playTimeRewardService.stop();
-        }
-        
-        // Save player cache
-        if (playerService != null) {
-            playerService.save();
-            getLogger().at(Level.INFO).log("Player cache saved.");
         }
         
         getLogger().at(Level.INFO).log("EliteEssentials disabled.");
@@ -607,8 +600,8 @@ public class EliteEssentials extends JavaPlugin {
         return playerService;
     }
     
-    public PlayerStorage getPlayerStorage() {
-        return playerStorage;
+    public PlayerFileStorage getPlayerFileStorage() {
+        return playerFileStorage;
     }
     
     public CostService getCostService() {
@@ -663,9 +656,9 @@ public class EliteEssentials extends JavaPlugin {
             aliasService.reload();
         }
         
-        // Reload player cache
-        if (playerService != null) {
-            playerService.reload();
+        // Reload player file storage index
+        if (playerFileStorage != null) {
+            playerFileStorage.reload();
         }
         
         // Reload playtime rewards

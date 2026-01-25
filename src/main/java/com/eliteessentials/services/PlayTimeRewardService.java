@@ -5,8 +5,9 @@ import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.config.PluginConfig;
 import com.eliteessentials.integration.LuckPermsIntegration;
 import com.eliteessentials.model.PlayTimeReward;
-import com.eliteessentials.model.PlayerData;
+import com.eliteessentials.model.PlayerFile;
 import com.eliteessentials.storage.PlayTimeRewardStorage;
+import com.eliteessentials.storage.PlayerFileStorage;
 import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -19,14 +20,17 @@ import java.util.logging.Logger;
 /**
  * Service for managing playtime rewards.
  * Periodically checks online players and grants eligible rewards.
+ * Reward definitions are in playtime_rewards.json (server-wide).
+ * Player claims are stored in per-player files via PlayerFileStorage.
  */
 public class PlayTimeRewardService {
 
     private static final Logger logger = Logger.getLogger("EliteEssentials");
     
-    private final PlayTimeRewardStorage storage;
+    private final PlayTimeRewardStorage storage;  // For reward definitions only
     private final PlayerService playerService;
     private final ConfigManager configManager;
+    private PlayerFileStorage playerFileStorage;
     
     private ScheduledExecutorService scheduler;
     private final Map<UUID, Long> sessionStartTimes = new ConcurrentHashMap<>();
@@ -37,6 +41,13 @@ public class PlayTimeRewardService {
         this.storage = storage;
         this.playerService = playerService;
         this.configManager = configManager;
+    }
+    
+    /**
+     * Set the player file storage (called after initialization).
+     */
+    public void setPlayerFileStorage(PlayerFileStorage storage) {
+        this.playerFileStorage = storage;
     }
     
     /**
@@ -96,7 +107,7 @@ public class PlayTimeRewardService {
         // Initialize baseline for new playtime tracking if needed
         PluginConfig config = configManager.getConfig();
         if (config.playTimeRewards.onlyCountNewPlaytime && !playerBaselines.containsKey(playerId)) {
-            Optional<PlayerData> playerOpt = playerService.getPlayer(playerId);
+            Optional<PlayerFile> playerOpt = playerService.getPlayer(playerId);
             if (playerOpt.isPresent()) {
                 long storedSeconds = playerOpt.get().getPlayTime();
                 playerBaselines.put(playerId, storedSeconds);
@@ -151,7 +162,7 @@ public class PlayTimeRewardService {
             return;
         }
         
-        Optional<PlayerData> playerOpt = playerService.getPlayer(playerId);
+        Optional<PlayerFile> playerOpt = playerService.getPlayer(playerId);
         if (playerOpt.isEmpty()) {
             if (configManager.isDebugEnabled()) {
                 logger.info("[PlayTimeRewards] No player data found for " + playerId);
@@ -159,7 +170,7 @@ public class PlayTimeRewardService {
             return;
         }
         
-        PlayerData playerData = playerOpt.get();
+        PlayerFile playerData = playerOpt.get();
         long totalPlayTimeMinutes = getTotalPlayTimeMinutes(playerId, playerData);
         
         if (configManager.isDebugEnabled()) {
@@ -186,7 +197,7 @@ public class PlayTimeRewardService {
      * Get total play time including current session.
      * If onlyCountNewPlaytime is enabled, only counts time since the system was enabled.
      */
-    private long getTotalPlayTimeMinutes(UUID playerId, PlayerData playerData) {
+    private long getTotalPlayTimeMinutes(UUID playerId, PlayerFile playerData) {
         PluginConfig config = configManager.getConfig();
         
         long storedSeconds = playerData.getPlayTime();
@@ -238,15 +249,31 @@ public class PlayTimeRewardService {
      * Check and grant a milestone (one-time) reward.
      */
     private void checkMilestoneReward(UUID playerId, String playerName, PlayTimeReward reward, long totalMinutes) {
-        // Already claimed?
-        if (storage.hasClaimed(playerId, reward.getId())) {
+        // Already claimed? Check player file
+        if (playerFileStorage != null) {
+            PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+            if (playerFile != null && playerFile.hasClaimedMilestone(reward.getId())) {
+                return;
+            }
+        } else if (storage.hasClaimed(playerId, reward.getId())) {
+            // Fallback to old storage if playerFileStorage not set
             return;
         }
         
         // Eligible?
         if (totalMinutes >= reward.getMinutesRequired()) {
             grantReward(playerId, playerName, reward);
-            storage.markMilestoneClaimed(playerId, reward.getId());
+            
+            // Mark as claimed in player file
+            if (playerFileStorage != null) {
+                PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+                if (playerFile != null) {
+                    playerFile.claimMilestone(reward.getId());
+                    playerFileStorage.saveAndMarkDirty(playerId);
+                }
+            } else {
+                storage.markMilestoneClaimed(playerId, reward.getId());
+            }
             
             // Broadcast milestone if configured
             PluginConfig config = configManager.getConfig();
@@ -265,7 +292,16 @@ public class PlayTimeRewardService {
      * Only grants ONE reward per check cycle to prevent spam.
      */
     private void checkRepeatableReward(UUID playerId, String playerName, PlayTimeReward reward, long totalMinutes) {
-        int claimCount = storage.getClaimCount(playerId, reward.getId());
+        int claimCount;
+        
+        // Get claim count from player file
+        if (playerFileStorage != null) {
+            PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+            claimCount = playerFile != null ? playerFile.getRepeatableClaimCount(reward.getId()) : 0;
+        } else {
+            claimCount = storage.getClaimCount(playerId, reward.getId());
+        }
+        
         int interval = reward.getMinutesRequired();
         
         // How many times should they have received this reward by now?
@@ -281,7 +317,17 @@ public class PlayTimeRewardService {
         // If they're behind, they'll catch up over multiple cycles
         if (claimCount < expectedClaims) {
             grantReward(playerId, playerName, reward);
-            storage.incrementRepeatableClaim(playerId, reward.getId());
+            
+            // Increment claim count in player file
+            if (playerFileStorage != null) {
+                PlayerFile playerFile = playerFileStorage.getPlayer(playerId);
+                if (playerFile != null) {
+                    playerFile.incrementRepeatableClaim(reward.getId());
+                    playerFileStorage.saveAndMarkDirty(playerId);
+                }
+            } else {
+                storage.incrementRepeatableClaim(playerId, reward.getId());
+            }
             claimCount++;
             
             if (configManager.isDebugEnabled()) {

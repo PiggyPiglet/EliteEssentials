@@ -3,7 +3,7 @@ package com.eliteessentials.commands.hytale;
 import com.eliteessentials.api.EconomyAPI;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.config.PluginConfig;
-import com.eliteessentials.model.PlayerData;
+import com.eliteessentials.model.PlayerFile;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.util.CommandPermissionUtil;
@@ -65,7 +65,7 @@ public class HytaleBaltopCommand extends AbstractPlayerCommand {
         }
         
         // Get top players
-        List<PlayerData> topPlayers = playerService.getTopByBalance(economyConfig.baltopLimit);
+        List<PlayerFile> topPlayers = playerService.getTopByBalance(economyConfig.baltopLimit);
         
         if (topPlayers.isEmpty()) {
             ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("baltopEmpty"), "#FFAA00"));
@@ -78,7 +78,7 @@ public class HytaleBaltopCommand extends AbstractPlayerCommand {
         
         // List entries
         int rank = 1;
-        for (PlayerData data : topPlayers) {
+        for (PlayerFile data : topPlayers) {
             String entry = configManager.getMessage("baltopEntry",
                 "rank", String.valueOf(rank),
                 "player", data.getName(),

@@ -6,6 +6,7 @@ import com.eliteessentials.config.PluginConfig;
 import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.services.PlayTimeRewardService;
 import com.eliteessentials.storage.MotdStorage;
+import com.eliteessentials.storage.PlayerFileStorage;
 import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.event.EventRegistry;
@@ -20,11 +21,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -33,10 +29,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 
 /**
  * Handles player join/quit events.
@@ -52,15 +44,12 @@ import com.google.gson.reflect.TypeToken;
 public class JoinQuitListener {
     
     private static final Logger logger = Logger.getLogger("EliteEssentials");
-    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     
     private final ConfigManager configManager;
     private final MotdStorage motdStorage;
     private final PlayerService playerService;
-    private final File firstJoinFile;
-    private final Set<UUID> firstJoinPlayers;
-    private final Object fileLock = new Object();
     private final ScheduledExecutorService scheduler;
+    private PlayerFileStorage playerFileStorage;
     
     // Track players currently on the server to differentiate world changes from joins/quits
     private final Set<UUID> onlinePlayers = ConcurrentHashMap.newKeySet();
@@ -71,18 +60,22 @@ public class JoinQuitListener {
     // Track the last world each player was in (to detect world changes when DrainEvent doesn't fire)
     private final ConcurrentHashMap<UUID, String> playerLastWorld = new ConcurrentHashMap<>();
     
-    public JoinQuitListener(ConfigManager configManager, MotdStorage motdStorage, PlayerService playerService, File dataFolder) {
+    public JoinQuitListener(ConfigManager configManager, MotdStorage motdStorage, PlayerService playerService) {
         this.configManager = configManager;
         this.motdStorage = motdStorage;
         this.playerService = playerService;
-        this.firstJoinFile = new File(dataFolder, "first_join.json");
-        this.firstJoinPlayers = new HashSet<>();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "EliteEssentials-JoinQuit");
             t.setDaemon(true);
             return t;
         });
-        load();
+    }
+    
+    /**
+     * Set the player file storage (called after initialization).
+     */
+    public void setPlayerFileStorage(PlayerFileStorage storage) {
+        this.playerFileStorage = storage;
     }
     
     /**
@@ -260,14 +253,24 @@ public class JoinQuitListener {
                 rewardService.onPlayerJoin(playerId);
             }
             
-            // Check if first join
-            boolean isFirstJoin = !firstJoinPlayers.contains(playerId);
+            // Check if first join by checking if player file existed on disk before this session
+            // We check the file directly because playerService.onPlayerJoin() just created it
+            boolean isFirstJoin = false;
+            if (playerFileStorage != null) {
+                File playerFile = new File(playerFileStorage.getPlayersFolder(), playerId.toString() + ".json");
+                // If file was just created (by onPlayerJoin above), check if it's very new
+                // Actually, we need to check BEFORE onPlayerJoin creates it - but that already ran
+                // So we check if the player's firstJoin timestamp is within the last few seconds
+                var playerData = playerFileStorage.getPlayer(playerId);
+                if (playerData != null) {
+                    long firstJoinTime = playerData.getFirstJoin();
+                    long now = System.currentTimeMillis();
+                    // If firstJoin was set within the last 5 seconds, this is a new player
+                    isFirstJoin = (now - firstJoinTime) < 5000;
+                }
+            }
             
             if (isFirstJoin) {
-                // Add to first join set
-                firstJoinPlayers.add(playerId);
-                save();
-                
                 // Broadcast first join message
                 if (config.joinMsg.firstJoinEnabled) {
                     String message = configManager.getMessage("firstJoinMessage", "player", playerName);
@@ -441,39 +444,6 @@ public class JoinQuitListener {
             }
         } catch (Exception e) {
             logger.warning("Could not broadcast message: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Load first join data from file.
-     */
-    private void load() {
-        if (!firstJoinFile.exists()) {
-            return;
-        }
-        
-        synchronized (fileLock) {
-            try (FileReader reader = new FileReader(firstJoinFile, StandardCharsets.UTF_8)) {
-                Set<UUID> loaded = gson.fromJson(reader, new TypeToken<Set<UUID>>(){}.getType());
-                if (loaded != null) {
-                    firstJoinPlayers.addAll(loaded);
-                }
-            } catch (IOException e) {
-                logger.warning("Could not load first_join.json: " + e.getMessage());
-            }
-        }
-    }
-    
-    /**
-     * Save first join data to file.
-     */
-    private void save() {
-        synchronized (fileLock) {
-            try (FileWriter writer = new FileWriter(firstJoinFile, StandardCharsets.UTF_8)) {
-                gson.toJson(firstJoinPlayers, writer);
-            } catch (IOException e) {
-                logger.severe("Could not save first_join.json: " + e.getMessage());
-            }
         }
     }
     

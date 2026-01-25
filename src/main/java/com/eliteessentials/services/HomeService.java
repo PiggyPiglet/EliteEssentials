@@ -2,8 +2,9 @@ package com.eliteessentials.services;
 
 import com.eliteessentials.model.Home;
 import com.eliteessentials.model.Location;
+import com.eliteessentials.model.PlayerFile;
 import com.eliteessentials.permissions.PermissionService;
-import com.eliteessentials.storage.HomeStorage;
+import com.eliteessentials.storage.PlayerFileStorage;
 
 import java.util.Map;
 import java.util.Optional;
@@ -21,9 +22,9 @@ public class HomeService {
 
     private static final Logger logger = Logger.getLogger("EliteEssentials");
 
-    private final HomeStorage storage;
+    private final PlayerFileStorage storage;
 
-    public HomeService(HomeStorage storage) {
+    public HomeService(PlayerFileStorage storage) {
         this.storage = storage;
     }
 
@@ -51,22 +52,26 @@ public class HomeService {
         }
 
         String normalizedName = name.toLowerCase().trim();
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) {
+            return Result.INVALID_NAME;
+        }
         
         // Check if updating existing home (doesn't count against limit)
-        boolean isUpdate = storage.hasHome(playerId, normalizedName);
+        boolean isUpdate = playerFile.hasHome(normalizedName);
         
         if (!isUpdate) {
             int maxHomes = getMaxHomes(playerId);
-            if (storage.getHomeCount(playerId) >= maxHomes) {
+            if (playerFile.getHomeCount() >= maxHomes) {
                 return Result.LIMIT_REACHED;
             }
         }
 
         Home home = new Home(normalizedName, location);
-        storage.setHome(playerId, home);
+        playerFile.setHome(home);
         
         // Persist immediately to disk so data isn't lost on crash
-        storage.save();
+        storage.saveAndMarkDirty(playerId);
         
         logger.info("Player " + playerId + " set home '" + normalizedName + "' at " + location);
         return Result.SUCCESS;
@@ -79,7 +84,11 @@ public class HomeService {
         if (name == null || name.isBlank()) {
             return Optional.empty();
         }
-        return storage.getHome(playerId, name.toLowerCase().trim());
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) {
+            return Optional.empty();
+        }
+        return playerFile.getHome(name.toLowerCase().trim());
     }
 
     /**
@@ -90,13 +99,18 @@ public class HomeService {
             return Result.INVALID_NAME;
         }
         
-        boolean deleted = storage.deleteHome(playerId, name.toLowerCase().trim());
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) {
+            return Result.HOME_NOT_FOUND;
+        }
+        
+        boolean deleted = playerFile.deleteHome(name.toLowerCase().trim());
         if (!deleted) {
             return Result.HOME_NOT_FOUND;
         }
         
         // Persist the change to disk
-        storage.save();
+        storage.saveAndMarkDirty(playerId);
         
         logger.info("Player " + playerId + " deleted home '" + name + "'");
         return Result.SUCCESS;
@@ -106,21 +120,33 @@ public class HomeService {
      * Get all homes for a player.
      */
     public Map<String, Home> getHomes(UUID playerId) {
-        return storage.getHomes(playerId);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) {
+            return Map.of();
+        }
+        return playerFile.getHomes();
     }
 
     /**
      * Get all home names for a player.
      */
     public Set<String> getHomeNames(UUID playerId) {
-        return storage.getHomeNames(playerId);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) {
+            return Set.of();
+        }
+        return playerFile.getHomeNames();
     }
 
     /**
      * Get the number of homes a player has.
      */
     public int getHomeCount(UUID playerId) {
-        return storage.getHomeCount(playerId);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) {
+            return 0;
+        }
+        return playerFile.getHomeCount();
     }
 
     /**
@@ -141,6 +167,6 @@ public class HomeService {
      * Save all home data to disk.
      */
     public void save() {
-        storage.save();
+        storage.saveAll();
     }
 }

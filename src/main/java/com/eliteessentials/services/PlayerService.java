@@ -1,28 +1,28 @@
 package com.eliteessentials.services;
 
 import com.eliteessentials.config.ConfigManager;
-import com.eliteessentials.model.PlayerData;
-import com.eliteessentials.storage.PlayerStorage;
+import com.eliteessentials.model.PlayerFile;
+import com.eliteessentials.storage.PlayerFileStorage;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
- * Service for managing player data cache.
+ * Service for managing player data.
  * Tracks player sessions and updates play time on disconnect.
  */
 public class PlayerService {
 
     private static final Logger logger = Logger.getLogger("EliteEssentials");
     
-    private final PlayerStorage storage;
+    private final PlayerFileStorage storage;
     private final ConfigManager configManager;
     
     // Track session start times for play time calculation
     private final Map<UUID, Long> sessionStartTimes = new ConcurrentHashMap<>();
 
-    public PlayerService(PlayerStorage storage, ConfigManager configManager) {
+    public PlayerService(PlayerFileStorage storage, ConfigManager configManager) {
         this.storage = storage;
         this.configManager = configManager;
     }
@@ -31,14 +31,15 @@ public class PlayerService {
      * Called when a player joins the server.
      * Creates or updates their player data.
      */
-    public PlayerData onPlayerJoin(UUID playerId, String playerName) {
+    public PlayerFile onPlayerJoin(UUID playerId, String playerName) {
         boolean isNew = !storage.hasPlayer(playerId);
-        PlayerData data = storage.getOrCreatePlayer(playerId, playerName);
+        PlayerFile data = storage.getPlayer(playerId, playerName);
         
         // Update name in case it changed
         if (!data.getName().equals(playerName)) {
             logger.info("Player " + playerId + " name changed: " + data.getName() + " -> " + playerName);
             data.setName(playerName);
+            storage.markDirty(playerId);
         }
         
         // Set starting balance for new players if economy is enabled
@@ -46,12 +47,18 @@ public class PlayerService {
             double startingBalance = configManager.getConfig().economy.startingBalance;
             if (startingBalance > 0) {
                 data.setWallet(startingBalance);
+                storage.markDirty(playerId);
                 logger.info("Set starting balance of " + startingBalance + " for new player " + playerName);
             }
         }
         
         // Track session start
         sessionStartTimes.put(playerId, System.currentTimeMillis());
+        
+        // Save if new player
+        if (isNew) {
+            storage.savePlayer(playerId);
+        }
         
         return data;
     }
@@ -61,7 +68,8 @@ public class PlayerService {
      * Updates last seen and play time.
      */
     public void onPlayerQuit(UUID playerId) {
-        storage.getPlayer(playerId).ifPresent(data -> {
+        PlayerFile data = storage.getPlayer(playerId);
+        if (data != null) {
             // Update last seen
             data.updateLastSeen();
             
@@ -72,11 +80,11 @@ public class PlayerService {
                 data.addPlayTime(sessionSeconds);
             }
             
-            storage.updatePlayer(data);
-        });
+            storage.markDirty(playerId);
+        }
         
-        // Save after player quits
-        storage.save();
+        // Unload player (saves if dirty)
+        storage.unloadPlayer(playerId);
     }
 
     /**
@@ -89,39 +97,36 @@ public class PlayerService {
     /**
      * Get player data by UUID.
      */
-    public Optional<PlayerData> getPlayer(UUID playerId) {
-        return storage.getPlayer(playerId);
+    public Optional<PlayerFile> getPlayer(UUID playerId) {
+        return Optional.ofNullable(storage.getPlayer(playerId));
     }
 
     /**
      * Get player data by name.
      */
-    public Optional<PlayerData> getPlayerByName(String name) {
-        return storage.getPlayerByName(name);
+    public Optional<PlayerFile> getPlayerByName(String name) {
+        return Optional.ofNullable(storage.getPlayerByName(name));
     }
 
     /**
      * Get wallet balance for a player.
      */
     public double getBalance(UUID playerId) {
-        return storage.getPlayer(playerId)
-                .map(PlayerData::getWallet)
-                .orElse(0.0);
+        PlayerFile data = storage.getPlayer(playerId);
+        return data != null ? data.getWallet() : 0.0;
     }
 
     /**
      * Add money to a player's wallet.
      */
     public boolean addMoney(UUID playerId, double amount) {
-        Optional<PlayerData> opt = storage.getPlayer(playerId);
-        if (opt.isEmpty()) {
+        PlayerFile data = storage.getPlayer(playerId);
+        if (data == null) {
             return false;
         }
         
-        PlayerData data = opt.get();
         data.modifyWallet(amount);
-        storage.updatePlayer(data);
-        storage.save();
+        storage.saveAndMarkDirty(playerId);
         return true;
     }
 
@@ -130,18 +135,16 @@ public class PlayerService {
      * Returns false if insufficient funds.
      */
     public boolean removeMoney(UUID playerId, double amount) {
-        Optional<PlayerData> opt = storage.getPlayer(playerId);
-        if (opt.isEmpty()) {
+        PlayerFile data = storage.getPlayer(playerId);
+        if (data == null) {
             return false;
         }
         
-        PlayerData data = opt.get();
         if (!data.modifyWallet(-amount)) {
             return false;  // Insufficient funds
         }
         
-        storage.updatePlayer(data);
-        storage.save();
+        storage.saveAndMarkDirty(playerId);
         return true;
     }
 
@@ -149,15 +152,13 @@ public class PlayerService {
      * Set a player's wallet balance directly.
      */
     public boolean setBalance(UUID playerId, double amount) {
-        Optional<PlayerData> opt = storage.getPlayer(playerId);
-        if (opt.isEmpty()) {
+        PlayerFile data = storage.getPlayer(playerId);
+        if (data == null) {
             return false;
         }
         
-        PlayerData data = opt.get();
         data.setWallet(amount);
-        storage.updatePlayer(data);
-        storage.save();
+        storage.saveAndMarkDirty(playerId);
         return true;
     }
 
@@ -171,24 +172,24 @@ public class PlayerService {
     /**
      * Get all players sorted by last seen.
      */
-    public List<PlayerData> getRecentPlayers(int limit) {
-        List<PlayerData> players = storage.getPlayersByLastSeen();
+    public List<PlayerFile> getRecentPlayers(int limit) {
+        List<PlayerFile> players = storage.getPlayersByLastSeen();
         return players.subList(0, Math.min(limit, players.size()));
     }
 
     /**
      * Get top players by play time.
      */
-    public List<PlayerData> getTopByPlayTime(int limit) {
-        List<PlayerData> players = storage.getPlayersByPlayTime();
+    public List<PlayerFile> getTopByPlayTime(int limit) {
+        List<PlayerFile> players = storage.getPlayersByPlayTime();
         return players.subList(0, Math.min(limit, players.size()));
     }
 
     /**
      * Get top players by wallet balance.
      */
-    public List<PlayerData> getTopByBalance(int limit) {
-        List<PlayerData> players = storage.getPlayersByWallet();
+    public List<PlayerFile> getTopByBalance(int limit) {
+        List<PlayerFile> players = storage.getPlayersByWallet();
         return players.subList(0, Math.min(limit, players.size()));
     }
 
@@ -220,13 +221,20 @@ public class PlayerService {
      * Save all player data.
      */
     public void save() {
-        storage.save();
+        storage.saveAll();
     }
 
     /**
      * Reload player data from disk.
      */
     public void reload() {
-        storage.load();
+        storage.reload();
+    }
+    
+    /**
+     * Get the underlying storage (for migration and advanced operations).
+     */
+    public PlayerFileStorage getStorage() {
+        return storage;
     }
 }

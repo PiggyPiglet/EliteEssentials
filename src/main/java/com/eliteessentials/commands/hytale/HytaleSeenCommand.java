@@ -1,7 +1,7 @@
 package com.eliteessentials.commands.hytale;
 
 import com.eliteessentials.config.ConfigManager;
-import com.eliteessentials.model.PlayerData;
+import com.eliteessentials.model.PlayerFile;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.util.CommandPermissionUtil;
@@ -71,7 +71,7 @@ public class HytaleSeenCommand extends AbstractPlayerCommand {
         }
         
         // Look up in player cache
-        Optional<PlayerData> dataOpt = playerService.getPlayerByName(targetName);
+        Optional<PlayerFile> dataOpt = playerService.getPlayerByName(targetName);
         
         if (dataOpt.isEmpty()) {
             ctx.sendMessage(MessageFormatter.formatWithFallback(
@@ -79,7 +79,7 @@ public class HytaleSeenCommand extends AbstractPlayerCommand {
             return;
         }
         
-        PlayerData data = dataOpt.get();
+        PlayerFile data = dataOpt.get();
         long lastSeen = data.getLastSeen();
         String relativeTime = formatRelativeTime(lastSeen);
         

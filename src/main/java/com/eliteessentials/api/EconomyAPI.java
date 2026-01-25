@@ -1,7 +1,7 @@
 package com.eliteessentials.api;
 
 import com.eliteessentials.EliteEssentials;
-import com.eliteessentials.model.PlayerData;
+import com.eliteessentials.model.PlayerFile;
 import com.eliteessentials.services.PlayerService;
 
 import java.util.Optional;
@@ -219,9 +219,9 @@ public final class EconomyAPI {
     /**
      * Get player data (for advanced usage).
      * @param playerId Player UUID
-     * @return Optional containing PlayerData if found
+     * @return Optional containing PlayerFile if found
      */
-    public static Optional<PlayerData> getPlayerData(UUID playerId) {
+    public static Optional<PlayerFile> getPlayerData(UUID playerId) {
         PlayerService service = getPlayerService();
         if (service == null) return Optional.empty();
         

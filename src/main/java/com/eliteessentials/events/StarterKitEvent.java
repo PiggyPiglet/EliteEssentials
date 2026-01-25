@@ -3,6 +3,7 @@ package com.eliteessentials.events;
 import com.eliteessentials.model.Kit;
 import com.eliteessentials.model.KitItem;
 import com.eliteessentials.services.KitService;
+import com.eliteessentials.storage.PlayerFileStorage;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventRegistry;
@@ -15,27 +16,28 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
-import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Logger;
 
 /**
  * Handles giving starter kits to new players on first join.
+ * Uses PlayerFileStorage to determine if player is new (no existing player file).
  */
 public class StarterKitEvent {
     private static final Logger logger = Logger.getLogger("EliteEssentials");
     
     private final KitService kitService;
-    private final File dataFolder;
-    private final Set<UUID> joinedPlayers = new HashSet<>();
-    private final File joinedFile;
+    private PlayerFileStorage playerFileStorage;
 
-    public StarterKitEvent(@Nonnull KitService kitService, @Nonnull File dataFolder) {
+    public StarterKitEvent(@Nonnull KitService kitService) {
         this.kitService = kitService;
-        this.dataFolder = dataFolder;
-        this.joinedFile = new File(dataFolder, "joined_players.txt");
-        loadJoinedPlayers();
+    }
+    
+    /**
+     * Set the player file storage (called after initialization).
+     */
+    public void setPlayerFileStorage(PlayerFileStorage storage) {
+        this.playerFileStorage = storage;
     }
 
     public void registerEvents(@Nonnull EventRegistry eventRegistry) {
@@ -62,16 +64,24 @@ public class StarterKitEvent {
             String username = playerRef.getUsername();
             logger.info("PlayerReadyEvent for: " + username + " (" + uuid + ")");
             
-            // Check if this is a new player
-            if (joinedPlayers.contains(uuid)) {
-                logger.info("Player " + username + " has already joined before, skipping starter kit");
+            // Check if this is a new player using PlayerFileStorage
+            // A player is "new" if their file doesn't exist on disk (not just in cache)
+            if (playerFileStorage == null) {
+                logger.warning("PlayerFileStorage not set, cannot check first join");
                 return;
             }
             
-            // Mark as joined
-            joinedPlayers.add(uuid);
-            saveJoinedPlayers();
-            logger.info("Marked " + username + " as joined (first time)");
+            // Check if player file exists on disk - this tells us if they've joined before
+            // We check the file directly because the cache might have been populated this session
+            java.io.File playerFile = new java.io.File(playerFileStorage.getPlayersFolder(), uuid.toString() + ".json");
+            boolean isNewPlayer = !playerFile.exists();
+            
+            if (!isNewPlayer) {
+                logger.info("Player " + username + " has joined before, skipping starter kit");
+                return;
+            }
+            
+            logger.info("New player detected: " + username + " (first join)");
             
             // Get starter kits
             List<Kit> starterKits = kitService.getStarterKits();
@@ -99,8 +109,7 @@ public class StarterKitEvent {
                 logger.info("Applying starter kit '" + kit.getDisplayName() + "' to " + username);
                 applyKit(kit, inventory);
                 
-                // Always mark starter kits as claimed to prevent re-claiming via /kit
-                // This applies regardless of whether the kit is onetime or has a cooldown
+                // Mark starter kits as claimed to prevent re-claiming via /kit
                 kitService.setOnetimeClaimed(uuid, kit.getId());
                 
                 logger.info("Applied starter kit '" + kit.getDisplayName() + "' to new player " + username);
@@ -146,49 +155,10 @@ public class StarterKitEvent {
     }
 
     /**
-     * Reload joined players from file (clears in-memory cache and reloads)
+     * Reload - no longer needed since we use PlayerFileStorage.
      */
     public void reload() {
-        joinedPlayers.clear();
-        loadJoinedPlayers();
-        logger.info("Reloaded joined players list (" + joinedPlayers.size() + " players)");
-    }
-
-    private void loadJoinedPlayers() {
-        if (!joinedFile.exists()) {
-            return;
-        }
-        
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(joinedFile), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (!line.isEmpty()) {
-                    try {
-                        joinedPlayers.add(UUID.fromString(line));
-                    } catch (IllegalArgumentException e) {
-                        // Skip invalid UUIDs
-                    }
-                }
-            }
-        } catch (IOException e) {
-            logger.warning("Failed to load joined players: " + e.getMessage());
-        }
-    }
-
-    private void saveJoinedPlayers() {
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs();
-        }
-        
-        try (PrintWriter writer = new PrintWriter(
-                new OutputStreamWriter(new FileOutputStream(joinedFile), StandardCharsets.UTF_8))) {
-            for (UUID uuid : joinedPlayers) {
-                writer.println(uuid.toString());
-            }
-        } catch (IOException e) {
-            logger.warning("Failed to save joined players: " + e.getMessage());
-        }
+        // No-op - PlayerFileStorage handles its own reloading
+        logger.info("StarterKitEvent reload (no action needed - uses PlayerFileStorage)");
     }
 }

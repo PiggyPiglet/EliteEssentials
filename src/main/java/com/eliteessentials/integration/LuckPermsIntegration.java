@@ -76,7 +76,7 @@ public class LuckPermsIntegration {
             boolean success = tryRegisterViaTreeView(allPermissions);
             
             if (success) {
-                logger.info("[LuckPerms] Registered " + allPermissions.size() + " permissions for autocomplete.");
+                logger.info("[LuckPerms] Registered permissions for autocomplete.");
                 registered = true;
                 return true;
             } else {

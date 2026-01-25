@@ -2,6 +2,31 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.1.2] - 2026-01-25
+
+### Changed
+
+- **Per-Player Data Storage**: Migrated from monolithic JSON files to individual player files for better scalability
+  - Player data now stored in `data/players/{uuid}.json` instead of large shared files
+  - Each player file contains: homes, back history, kit claims, kit cooldowns, playtime claims, wallet, play time, first join, last seen
+  - Name-to-UUID index maintained in `data/player_index.json` for offline player lookups
+  - Lazy loading: player data only loaded when needed, cached while online
+  - Automatic save on player disconnect and periodic dirty-check saves
+  - **Automatic Migration**: On first startup after update, old data files are automatically migrated
+    - Migrates: `homes.json`, `players.json`, `back_locations.json`, `kit_claims.json`, `playtime_claims.json`, `first_join.json`
+    - Old files moved to `backup/migration_{timestamp}/` folder after successful migration
+    - Migration is one-time and fully automatic - no manual steps required
+  - Server-wide data remains in separate files: `kits.json`, `warps.json`, `spawn.json`, `motd.json`, `rules.json`, `discord.json`, `aliases.json`, `autobroadcast.json`, `playtime_rewards.json`
+
+### Technical Improvements
+
+- New `PlayerFile` model consolidates all per-player data into a single class
+- New `PlayerFileStorage` handles file I/O with caching and thread-safe operations
+- New `DataMigrationService` handles one-time migration from old format
+- Updated services to use new storage: `HomeService`, `BackService`, `KitService`, `PlayerService`, `PlayTimeRewardService`
+- Better memory efficiency for servers with many players (only online players cached)
+- Improved data integrity with immediate saves after changes
+
 ## [1.1.1] - 2026-01-25
 
 ### Added

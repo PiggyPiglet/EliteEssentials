@@ -2,30 +2,30 @@ package com.eliteessentials.services;
 
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.model.Location;
+import com.eliteessentials.model.PlayerFile;
 import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.permissions.Permissions;
-import com.eliteessentials.storage.BackStorage;
+import com.eliteessentials.storage.PlayerFileStorage;
 
 import java.util.*;
 import java.util.logging.Logger;
 
 /**
  * Service for tracking player locations and providing /back functionality.
- * Maintains a history of locations for each player, persisted to JSON.
+ * Maintains a history of locations for each player, persisted to player files.
  */
 public class BackService {
 
     private static final Logger logger = Logger.getLogger("EliteEssentials");
 
     private final ConfigManager configManager;
-    private final BackStorage backStorage;
+    private final PlayerFileStorage storage;
+    private int maxHistory = 5;
 
-    public BackService(ConfigManager configManager, BackStorage backStorage) {
+    public BackService(ConfigManager configManager, PlayerFileStorage storage) {
         this.configManager = configManager;
-        this.backStorage = backStorage;
-        
-        // Configure storage with max history from config
-        backStorage.setMaxHistory(configManager.getBackMaxHistory());
+        this.storage = storage;
+        this.maxHistory = configManager.getBackMaxHistory();
     }
 
     /**
@@ -37,7 +37,11 @@ public class BackService {
     public void pushLocation(UUID playerId, Location location) {
         if (location == null || playerId == null) return;
         
-        backStorage.pushLocation(playerId, location);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) return;
+        
+        playerFile.pushBackLocation(location, maxHistory);
+        storage.saveAndMarkDirty(playerId);
         logger.fine("Recorded location for " + playerId + ": " + location);
     }
 
@@ -76,7 +80,9 @@ public class BackService {
      * Get the most recent location for a player without removing it.
      */
     public Optional<Location> peekLocation(UUID playerId) {
-        return backStorage.peekLocation(playerId);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) return Optional.empty();
+        return playerFile.peekBackLocation();
     }
 
     /**
@@ -86,8 +92,14 @@ public class BackService {
      * @return The previous location, or empty if none
      */
     public Optional<Location> popLocation(UUID playerId) {
-        Optional<Location> location = backStorage.popLocation(playerId);
-        location.ifPresent(loc -> logger.fine("Popped location for " + playerId + ": " + loc));
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) return Optional.empty();
+        
+        Optional<Location> location = playerFile.popBackLocation();
+        if (location.isPresent()) {
+            storage.saveAndMarkDirty(playerId);
+            logger.fine("Popped location for " + playerId + ": " + location.get());
+        }
         return location;
     }
 
@@ -95,27 +107,34 @@ public class BackService {
      * Get the number of stored locations for a player.
      */
     public int getHistorySize(UUID playerId) {
-        return backStorage.getHistorySize(playerId);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) return 0;
+        return playerFile.getBackHistorySize();
     }
 
     /**
      * Get all stored locations for a player (for debugging).
      */
     public List<Location> getHistory(UUID playerId) {
-        return backStorage.getHistory(playerId);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) return Collections.emptyList();
+        return playerFile.getBackHistory();
     }
 
     /**
      * Clear all location history for a player.
      */
     public void clearHistory(UUID playerId) {
-        backStorage.clearHistory(playerId);
+        PlayerFile playerFile = storage.getPlayer(playerId);
+        if (playerFile == null) return;
+        playerFile.clearBackHistory();
+        storage.saveAndMarkDirty(playerId);
     }
 
     /**
      * Save all data (called on shutdown).
      */
     public void save() {
-        backStorage.save();
+        storage.saveAll();
     }
 }
