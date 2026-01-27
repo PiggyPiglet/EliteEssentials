@@ -1,40 +1,54 @@
 $C = "../Common.ui";
 
-Button {
-  LayoutMode: Top;
-  Anchor: (Left: 2, Right: 2, Bottom: 5, Height: 70, Width: 400);
+Group {
+  LayoutMode: Left;
+  Anchor: (Left: 2, Right: 2, Bottom: 6, Height: 70);
   Background: $C.@InputBoxBackground;
   Padding: (Top: 8, Bottom: 8, Left: 10, Right: 10);
-  Style: ButtonStyle(
-    Sounds: $C.@ButtonSounds,
-  );
 
-  Group {
+  Group #WarpInfo {
     LayoutMode: Top;
+    FlexWeight: 1;
+    Anchor: (Left: 0, Right: 10);
 
-    Label #WarpName {
-      Style: (
-        FontSize: 16,
-        RenderBold: true,
-        TextColor: #55FFFF,
-        HorizontalAlignment: Center
-      );
+    Group {
+      LayoutMode: Top;
+      Anchor: (Height: 44, Top: 6);
+
+      Label #WarpName {
+        Style: (
+          FontSize: 18,
+          RenderBold: true,
+          TextColor: #55FFFF,
+          HorizontalAlignment: Start
+        );
+      }
+
+      Label #WarpDescription {
+        Style: (
+          FontSize: 11,
+          TextColor: #AAAAAA,
+          HorizontalAlignment: Start
+        );
+      }
+
+      Label #WarpStatus {
+        Style: (
+          FontSize: 10,
+          TextColor: #FF5555,
+          HorizontalAlignment: Start
+        );
+      }
     }
+  }
 
-    Label #WarpDescription {
-      Style: (
-        FontSize: 11,
-        TextColor: #AAAAAA,
-        HorizontalAlignment: Center
-      );
-    }
+  Group #WarpActions {
+    LayoutMode: Right;
+    Anchor: (Right: 0, Width: 140);
 
-    Label #WarpStatus {
-      Style: (
-        FontSize: 10,
-        TextColor: #FF5555,
-        HorizontalAlignment: Center
-      );
+    $C.@TextButton #WarpButton {
+      @Anchor = (Width: 120);
+      Text: "Warp";
     }
   }
 }

@@ -109,7 +109,7 @@ public class WarpSelectionPage extends InteractiveCustomUIPage<WarpSelectionPage
             // Bind click event
             eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
-                selector,
+                selector + " #WarpButton",
                 EventData.of("Warp", warp.getName())
             );
         }

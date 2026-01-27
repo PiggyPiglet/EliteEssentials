@@ -565,6 +565,10 @@ public class EliteEssentials extends JavaPlugin {
     public TpaService getTpaService() {
         return tpaService;
     }
+
+    public VanishService getVanishService() {
+        return vanishService;
+    }
     
     public RtpService getRtpService() {
         return rtpService;
