@@ -3,6 +3,7 @@ package com.eliteessentials.listeners;
 import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.config.PluginConfig;
+import com.eliteessentials.services.MailService;
 import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.services.PlayTimeRewardService;
 import com.eliteessentials.storage.MotdStorage;
@@ -66,6 +67,7 @@ public class JoinQuitListener {
     private PlayerFileStorage playerFileStorage;
     private SpawnStorage spawnStorage;
     private com.eliteessentials.services.VanishService vanishService;
+    private MailService mailService;
     
     // Track players currently on the server to differentiate world changes from joins/quits
     private final Set<UUID> onlinePlayers = ConcurrentHashMap.newKeySet();
@@ -106,6 +108,13 @@ public class JoinQuitListener {
      */
     public void setVanishService(com.eliteessentials.services.VanishService service) {
         this.vanishService = service;
+    }
+    
+    /**
+     * Set the mail service (called after initialization).
+     */
+    public void setMailService(MailService service) {
+        this.mailService = service;
     }
     
     /**
@@ -420,6 +429,20 @@ public class JoinQuitListener {
             
             // Also show world-specific MOTD for the initial world
             showWorldMotd(playerRef, worldName);
+            
+            // Notify about unread mail
+            if (config.mail.enabled && config.mail.notifyOnLogin && mailService != null) {
+                int unreadCount = mailService.getUnreadCount(playerId);
+                if (unreadCount > 0) {
+                    int mailDelay = config.mail.notifyDelaySeconds;
+                    final int finalUnreadCount = unreadCount;
+                    scheduler.schedule(() -> {
+                        String mailMsg = configManager.getMessage("mailNotifyLogin", 
+                            "count", String.valueOf(finalUnreadCount));
+                        playerRef.sendMessage(MessageFormatter.format(mailMsg));
+                    }, mailDelay, TimeUnit.SECONDS);
+                }
+            }
         });
     }
     

@@ -55,6 +55,7 @@ public class PluginConfig {
     public AutoBroadcastConfig autoBroadcast = new AutoBroadcastConfig();
     public AliasConfig aliases = new AliasConfig();
     public EconomyConfig economy = new EconomyConfig();
+    public MailConfig mail = new MailConfig();
     
     // ==================== MESSAGES ====================
     
@@ -215,10 +216,16 @@ public class PluginConfig {
         messages.put("vanishFakeJoin", "&e{player} &7joined the server.");
         
         // ==================== GROUP CHAT ====================
-        messages.put("groupChatNoAccess", "&cYou don't have access to any group chats.");
+        messages.put("groupChatNoAccess", "&cYou don't have access to any chat channels.");
         messages.put("groupChatUsage", "&cUsage: &e/gc <message>");
         messages.put("groupChatUsageGroup", "&cUsage: &e/gc {group} <message>");
-        messages.put("groupChatUsageMultiple", "&cUsage: &e/gc [group] <message> &7- Groups: {groups}");
+        messages.put("groupChatUsageMultiple", "&cUsage: &e/gc [chat] <message> &7- Chats: {groups}");
+        
+        // ==================== CHATS LIST ====================
+        messages.put("chatsNoAccess", "&cYou don't have access to any chat channels.");
+        messages.put("chatsHeader", "&b&l=== &fYour Chat Channels &7({count}) &b&l===");
+        messages.put("chatsEntry", "{color}{prefix} &f{name} &7- {displayName}");
+        messages.put("chatsFooter", "&7Use &a/gc [chat] <message> &7or &a/g [chat] <message> &7to chat.");
         
         // ==================== REPAIR ====================
         messages.put("repairSuccess", "&aRepaired the item in your hand.");
@@ -311,6 +318,34 @@ public class PluginConfig {
         messages.put("costFailed", "&cFailed to process payment.");
         messages.put("baltopYourBalance", "&7Your balance: &a{balance}");
         messages.put("baltopEmpty", "&cNo player data found.");
+        
+        // ==================== MAIL ====================
+        messages.put("mailUsage", "&eUsage: &f/mail <send|read|list|clear|delete>");
+        messages.put("mailSendUsage", "&eUsage: &f/mail send <player> <message>");
+        messages.put("mailDeleteUsage", "&eUsage: &f/mail delete <number>");
+        messages.put("mailEmpty", "&7You have no mail.");
+        messages.put("mailSent", "&aMail sent to &f{player}&a.");
+        messages.put("mailReceived", "&aYou received new mail from &f{player}&a! Type &e/mail read &ato view.");
+        messages.put("mailSendSelf", "&cYou cannot send mail to yourself.");
+        messages.put("mailPlayerNotFound", "&cPlayer '&e{player}&c' has never joined this server.");
+        messages.put("mailOnCooldown", "&cPlease wait &e{seconds} &cseconds before sending mail to this player again.");
+        messages.put("mailRecipientFull", "&c{player}'s mailbox is full.");
+        messages.put("mailSendFailed", "&cFailed to send mail.");
+        messages.put("mailMessageTooLong", "&cMessage too long. Maximum &e{max} &ccharacters.");
+        messages.put("mailListHeader", "&b&l=== &fYour Mail &7({count} total, {unread} unread) &b&l===");
+        messages.put("mailListEntry", "{status}&f{number}. &7{date} &e{player}&7: &f{preview}");
+        messages.put("mailListMore", "&7...and {count} more. Use &e/mail read <number> &7to view.");
+        messages.put("mailListFooter", "&7Use &a/mail read [number] &7to read, &c/mail clear &7to delete all.");
+        messages.put("mailReadHeader", "&b&l=== &fMail {number}/{total} &b&l===");
+        messages.put("mailReadFrom", "&7From: &e{player} &7on &e{date}");
+        messages.put("mailReadContent", "&f{message}");
+        messages.put("mailNotFound", "&cMail not found.");
+        messages.put("mailInvalidNumber", "&cInvalid mail number.");
+        messages.put("mailCleared", "&aCleared &e{count} &amail messages.");
+        messages.put("mailClearedRead", "&aCleared &e{count} &aread mail messages.");
+        messages.put("mailDeleted", "&aMail deleted.");
+        messages.put("mailDeleteFailed", "&cFailed to delete mail.");
+        messages.put("mailNotifyLogin", "&aYou have &e{count} &aunread mail message(s). Type &e/mail &ato view.");
         
         // ==================== SEEN ====================
         messages.put("seenOnline", "&a{player} &7is currently &aonline&7.");
@@ -605,6 +640,9 @@ public class PluginConfig {
     public static class GodConfig {
         /** Enable/disable the /god command */
         public boolean enabled = true;
+        
+        /** Cooldown in seconds between uses (0 = no cooldown) */
+        public int cooldownSeconds = 0;
     }
 
     // ==================== HEAL ====================
@@ -632,6 +670,9 @@ public class PluginConfig {
     public static class FlyConfig {
         /** Enable/disable the /fly command */
         public boolean enabled = true;
+        
+        /** Cooldown in seconds between uses (0 = no cooldown) */
+        public int cooldownSeconds = 0;
     }
 
     // ==================== VANISH ====================
@@ -685,6 +726,9 @@ public class PluginConfig {
     public static class RepairConfig {
         /** Enable/disable the /repair command */
         public boolean enabled = true;
+        
+        /** Cooldown in seconds between uses (0 = no cooldown) */
+        public int cooldownSeconds = 0;
     }
 
     // ==================== TOP ====================
@@ -692,6 +736,9 @@ public class PluginConfig {
     public static class TopConfig {
         /** Enable/disable the /top command */
         public boolean enabled = true;
+        
+        /** Cooldown in seconds between uses (0 = no cooldown) */
+        public int cooldownSeconds = 0;
         
         /** Cost to use this command (0 = free, requires economy enabled) */
         public double cost = 0.0;
@@ -790,6 +837,9 @@ public class PluginConfig {
     public static class ClearInvConfig {
         /** Enable/disable the /clearinv command */
         public boolean enabled = true;
+        
+        /** Cooldown in seconds between uses (0 = no cooldown) */
+        public int cooldownSeconds = 0;
     }
     
     // ==================== LIST (Online Players) ====================
@@ -942,6 +992,32 @@ public class PluginConfig {
          * useExternalEconomy takes precedence (we consume, not provide).
          */
         public boolean useExternalEconomy = false;
+    }
+    
+    // ==================== MAIL ====================
+    
+    public static class MailConfig {
+        /** Enable/disable the mail system */
+        public boolean enabled = true;
+        
+        /** Maximum mail messages per player mailbox */
+        public int maxMailPerPlayer = 50;
+        
+        /** Maximum message length in characters */
+        public int maxMessageLength = 500;
+        
+        /** 
+         * Cooldown in seconds between sending mail to the SAME player.
+         * This prevents spam by limiting how often you can mail one person.
+         * Set to 0 to disable cooldown.
+         */
+        public int sendCooldownSeconds = 30;
+        
+        /** Show notification on login if player has unread mail */
+        public boolean notifyOnLogin = true;
+        
+        /** Delay in seconds before showing mail notification on login */
+        public int notifyDelaySeconds = 3;
     }
     
     // ==================== PLAYTIME REWARDS ====================

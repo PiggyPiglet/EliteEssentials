@@ -21,6 +21,7 @@ import com.eliteessentials.services.GodService;
 import com.eliteessentials.services.GroupChatService;
 import com.eliteessentials.services.HomeService;
 import com.eliteessentials.services.KitService;
+import com.eliteessentials.services.MailService;
 import com.eliteessentials.services.MessageService;
 import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.services.PlayTimeRewardService;
@@ -90,6 +91,7 @@ public class EliteEssentials extends JavaPlugin {
     private AliasService aliasService;
     private PlayerService playerService;
     private CostService costService;
+    private MailService mailService;
     private PlayTimeRewardStorage playTimeRewardStorage;
     private PlayTimeRewardService playTimeRewardService;
     private HytaleFlyCommand flyCommand;
@@ -195,6 +197,7 @@ public class EliteEssentials extends JavaPlugin {
         aliasService = new AliasService(this.dataFolder, getCommandRegistry());
         playerService = new PlayerService(playerFileStorage, configManager);
         costService = new CostService(configManager);
+        mailService = new MailService(playerFileStorage, configManager);
         
         // Initialize playtime rewards
         playTimeRewardStorage = new PlayTimeRewardStorage(this.dataFolder);
@@ -229,6 +232,7 @@ public class EliteEssentials extends JavaPlugin {
         joinQuitListener.setPlayerFileStorage(playerFileStorage);
         joinQuitListener.setSpawnStorage(spawnStorage);
         joinQuitListener.setVanishService(vanishService);
+        joinQuitListener.setMailService(mailService);
         joinQuitListener.registerEvents(getEventRegistry());
         getLogger().at(Level.INFO).log("Join/Quit listener registered.");
         
@@ -457,7 +461,7 @@ public class EliteEssentials extends JavaPlugin {
         
         // God command
         if (config.god.enabled) {
-            getCommandRegistry().registerCommand(new HytaleGodCommand(godService, configManager));
+            getCommandRegistry().registerCommand(new HytaleGodCommand(godService, configManager, cooldownService));
             registeredCommands.append("/god, ");
         }
         
@@ -470,7 +474,8 @@ public class EliteEssentials extends JavaPlugin {
         // Group chat command
         if (config.groupChat.enabled) {
             getCommandRegistry().registerCommand(new HytaleGroupChatCommand(groupChatService, configManager));
-            registeredCommands.append("/gc, ");
+            getCommandRegistry().registerCommand(new HytaleChatsCommand(groupChatService, configManager));
+            registeredCommands.append("/gc, /g, /chats, ");
         }
         
         // Send message command (admin - works from console)
@@ -479,7 +484,7 @@ public class EliteEssentials extends JavaPlugin {
         
         // Repair command
         if (config.repair.enabled) {
-            getCommandRegistry().registerCommand(new HytaleRepairCommand(configManager));
+            getCommandRegistry().registerCommand(new HytaleRepairCommand(configManager, cooldownService));
             registeredCommands.append("/repair, ");
         }
         
@@ -498,13 +503,13 @@ public class EliteEssentials extends JavaPlugin {
         
         // Top command
         if (config.top.enabled) {
-            getCommandRegistry().registerCommand(new HytaleTopCommand(backService, configManager));
+            getCommandRegistry().registerCommand(new HytaleTopCommand(backService, configManager, cooldownService));
             registeredCommands.append("/top, ");
         }
         
         // Fly commands
         if (config.fly.enabled) {
-            flyCommand = new HytaleFlyCommand(configManager);
+            flyCommand = new HytaleFlyCommand(configManager, cooldownService);
             getCommandRegistry().registerCommand(flyCommand);
             getCommandRegistry().registerCommand(new HytaleFlySpeedCommand(configManager));
             registeredCommands.append("/fly, /flyspeed, ");
@@ -536,7 +541,7 @@ public class EliteEssentials extends JavaPlugin {
         
         // Clear inventory command
         if (config.clearInv.enabled) {
-            getCommandRegistry().registerCommand(new HytaleClearInvCommand(configManager));
+            getCommandRegistry().registerCommand(new HytaleClearInvCommand(configManager, cooldownService));
             registeredCommands.append("/clearinv, ");
         }
         
@@ -564,6 +569,12 @@ public class EliteEssentials extends JavaPlugin {
         // Player info commands (always register - useful utility)
         getCommandRegistry().registerCommand(new HytaleSeenCommand(configManager, playerService));
         registeredCommands.append("/seen, ");
+        
+        // Mail command
+        if (config.mail.enabled) {
+            getCommandRegistry().registerCommand(new HytaleMailCommand(mailService, configManager, playerFileStorage));
+            registeredCommands.append("/mail, ");
+        }
         
         // Help command (always register)
         getCommandRegistry().registerCommand(new HytaleHelpCommand());
@@ -658,6 +669,10 @@ public class EliteEssentials extends JavaPlugin {
     
     public PlayerService getPlayerService() {
         return playerService;
+    }
+    
+    public MailService getMailService() {
+        return mailService;
     }
     
     public PlayerFileStorage getPlayerFileStorage() {

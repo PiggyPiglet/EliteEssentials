@@ -38,6 +38,9 @@ public class PlayerFile {
     // Playtime reward claims
     private PlaytimeClaims playtimeClaims = new PlaytimeClaims();
     
+    // Mail inbox
+    private List<MailMessage> mailbox = new ArrayList<>();
+    
     public PlayerFile() {
         // For Gson deserialization
     }
@@ -272,6 +275,31 @@ public class PlayerFile {
         PlaytimeClaims claims = getPlaytimeClaims();
         int current = claims.repeatableCounts.getOrDefault(rewardId, 0);
         claims.repeatableCounts.put(rewardId, current + 1);
+    }
+    
+    // ==================== Mailbox ====================
+    
+    public List<MailMessage> getMailbox() {
+        if (mailbox == null) {
+            mailbox = new ArrayList<>();
+        }
+        return mailbox;
+    }
+    
+    public void setMailbox(List<MailMessage> mailbox) {
+        this.mailbox = mailbox != null ? mailbox : new ArrayList<>();
+    }
+    
+    public void addMail(MailMessage mail) {
+        getMailbox().add(0, mail); // Add to front (newest first)
+    }
+    
+    public int getUnreadMailCount() {
+        return (int) getMailbox().stream().filter(m -> !m.isRead()).count();
+    }
+    
+    public void clearMailbox() {
+        getMailbox().clear();
     }
     
     // ==================== Inner Classes ====================

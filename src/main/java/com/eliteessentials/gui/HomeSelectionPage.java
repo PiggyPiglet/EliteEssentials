@@ -168,8 +168,9 @@ public class HomeSelectionPage extends InteractiveCustomUIPage<HomeSelectionPage
         CostService costService = EliteEssentials.getInstance().getCostService();
         double cost = config.homes.cost;
         if (costService != null && cost > 0) {
-            if (!costService.canAfford(playerId, cost)) {
-                sendMessage(configManager.getMessage("notEnoughMoney", "cost", costService.formatCost(cost)), "#FF5555");
+            if (!costService.canAfford(playerId, "home", cost)) {
+                double effectiveCost = costService.getEffectiveCost(playerId, "home", cost);
+                sendMessage(configManager.getMessage("notEnoughMoney", "cost", costService.formatCost(effectiveCost)), "#FF5555");
                 return;
             }
         }

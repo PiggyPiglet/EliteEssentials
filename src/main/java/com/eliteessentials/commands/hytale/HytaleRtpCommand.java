@@ -633,8 +633,13 @@ public class HytaleRtpCommand extends CommandBase {
         String location = String.format("%.0f, %.0f, %.0f", teleportX, teleportY, teleportZ);
         ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("rtpTeleported", "location", location), "#55FF55"));
         
-        // Only set cooldown for self-RTP
+        // Only set cooldown and charge cost for self-RTP
         if (!isAdminRtp) {
+            // Charge cost AFTER successful teleport
+            PlayerRef player = findPlayerByUuid(playerId);
+            if (player != null) {
+                CommandPermissionUtil.chargeCost(ctx, player, "rtp", rtpConfig.cost);
+            }
             rtpService.setCooldown(playerId);
         }
     }
@@ -696,6 +701,8 @@ public class HytaleRtpCommand extends CommandBase {
                 configManager.getMessage("rtpTeleportedWorld", "location", location, "world", worldName), "#55FF55"));
             
             if (!isAdminRtp) {
+                // Charge cost AFTER successful teleport
+                CommandPermissionUtil.chargeCost(ctx, player, "rtp", rtpConfig.cost);
                 rtpService.setCooldown(playerId);
             }
         });
@@ -710,6 +717,21 @@ public class HytaleRtpCommand extends CommandBase {
         
         for (PlayerRef p : universe.getPlayers()) {
             if (p.getUsername().equalsIgnoreCase(name)) {
+                return p;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Find an online player by UUID.
+     */
+    private PlayerRef findPlayerByUuid(UUID uuid) {
+        Universe universe = Universe.get();
+        if (universe == null) return null;
+        
+        for (PlayerRef p : universe.getPlayers()) {
+            if (p.getUuid().equals(uuid)) {
                 return p;
             }
         }

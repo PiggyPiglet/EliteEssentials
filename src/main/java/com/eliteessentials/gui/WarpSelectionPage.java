@@ -179,8 +179,9 @@ public class WarpSelectionPage extends InteractiveCustomUIPage<WarpSelectionPage
         CostService costService = EliteEssentials.getInstance().getCostService();
         double cost = config.warps.cost;
         if (costService != null && cost > 0) {
-            if (!costService.canAfford(playerId, cost)) {
-                sendMessage(configManager.getMessage("notEnoughMoney", "cost", costService.formatCost(cost)), "#FF5555");
+            if (!costService.canAfford(playerId, "warp", cost)) {
+                double effectiveCost = costService.getEffectiveCost(playerId, "warp", cost);
+                sendMessage(configManager.getMessage("notEnoughMoney", "cost", costService.formatCost(effectiveCost)), "#FF5555");
                 return;
             }
         }
