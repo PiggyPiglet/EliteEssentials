@@ -210,7 +210,7 @@ public class PluginConfig {
         // ==================== VANISH ====================
         messages.put("vanishEnabled", "&aYou are now vanished. Other players cannot see you.");
         messages.put("vanishDisabled", "&cYou are now visible to other players.");
-        messages.put("vanishReminder", "&7You are currently vanished.");
+        messages.put("vanishReminder", "&c&l>> YOU ARE STILL VANISHED <<");
         messages.put("vanishFakeLeave", "&e{player} &7left the server.");
         messages.put("vanishFakeJoin", "&e{player} &7joined the server.");
         
@@ -336,6 +336,8 @@ public class PluginConfig {
         messages.put("deathGeneric", "{player} died");
         
         // ==================== GUI LABELS ====================
+        messages.put("guiHomesTitle", "Your Homes ({count}/{max})");
+        messages.put("guiWarpsTitle", "Server Warps");
         messages.put("guiKitStatusLocked", "[Locked]");
         messages.put("guiKitStatusClaimed", "Claimed");
         messages.put("guiKitStatusReady", "Ready");
@@ -352,11 +354,19 @@ public class PluginConfig {
         /** Enable/disable the /rtp command */
         public boolean enabled = true;
         
-        /** Minimum distance from player for random location */
+        /** Minimum distance from player for random location (default for all worlds) */
         public int minRange = 100;
         
-        /** Maximum distance from player for random location */
+        /** Maximum distance from player for random location (default for all worlds) */
         public int maxRange = 5000;
+        
+        /**
+         * Per-world RTP range configuration.
+         * Key = world name (case-sensitive), Value = WorldRtpRange with min/max for that world.
+         * If a world is not in this map, it uses the default minRange/maxRange above.
+         * Example: {"nether": {minRange: 50, maxRange: 2000}, "end": {minRange: 100, maxRange: 1000}}
+         */
+        public Map<String, WorldRtpRange> worldRanges = createDefaultWorldRanges();
         
         /** Cooldown in seconds between uses (0 = no cooldown) */
         public int cooldownSeconds = 30;
@@ -381,6 +391,47 @@ public class PluginConfig {
         
         /** Cost to use this command (0 = free, requires economy enabled) */
         public double cost = 0.0;
+        
+        private static Map<String, WorldRtpRange> createDefaultWorldRanges() {
+            Map<String, WorldRtpRange> ranges = new HashMap<>();
+            // Example configurations - server owners can customize these
+            // ranges.put("nether", new WorldRtpRange(50, 2000));
+            // ranges.put("end", new WorldRtpRange(100, 1000));
+            return ranges;
+        }
+        
+        /**
+         * Get the RTP range for a specific world.
+         * Returns world-specific range if configured, otherwise returns default range.
+         */
+        public WorldRtpRange getRangeForWorld(String worldName) {
+            WorldRtpRange worldRange = worldRanges.get(worldName);
+            if (worldRange != null) {
+                return worldRange;
+            }
+            // Return default range
+            return new WorldRtpRange(minRange, maxRange);
+        }
+    }
+    
+    /**
+     * Per-world RTP range configuration.
+     */
+    public static class WorldRtpRange {
+        /** Minimum distance for this world */
+        public int minRange;
+        
+        /** Maximum distance for this world */
+        public int maxRange;
+        
+        public WorldRtpRange() {
+            this(100, 5000);
+        }
+        
+        public WorldRtpRange(int minRange, int maxRange) {
+            this.minRange = minRange;
+            this.maxRange = maxRange;
+        }
     }
 
     // ==================== BACK ====================
@@ -476,6 +527,13 @@ public class PluginConfig {
         
         /** Cost to use this command (0 = free, requires economy enabled) */
         public double cost = 0.0;
+        
+        /**
+         * Teleport new players to /setspawn location on first join.
+         * When true: First-time players are teleported to the spawn point after joining.
+         * When false (default): Players spawn at the world's default spawn location.
+         */
+        public boolean teleportOnFirstJoin = true;
     }
 
     // ==================== WARPS ====================
@@ -590,6 +648,26 @@ public class PluginConfig {
         
         /** Send fake join/leave messages when vanishing/unvanishing */
         public boolean mimicJoinLeave = true;
+        
+        /** 
+         * Persist vanish state across server restarts/reconnects.
+         * When true: Players who disconnect while vanished will remain vanished when they rejoin.
+         * When false (default): Vanish resets on disconnect.
+         */
+        public boolean persistOnReconnect = true;
+        
+        /**
+         * Suppress real join/quit messages for vanished players.
+         * When true: No join message when a vanished player connects, no quit message when they disconnect.
+         * Works with persistOnReconnect to keep vanished players truly hidden.
+         */
+        public boolean suppressJoinQuitMessages = true;
+        
+        /**
+         * Show a reminder to vanished players when they rejoin.
+         * Only applies when persistOnReconnect is true.
+         */
+        public boolean showReminderOnJoin = true;
     }
 
     // ==================== GROUP CHAT ====================
@@ -730,6 +808,24 @@ public class PluginConfig {
         /** Enable/disable group-based chat formatting */
         public boolean enabled = true;
         
+        /**
+         * Allow regular players to use color codes in chat (&c, &#FF0000, etc).
+         * When true: Everyone can use colors in chat.
+         * When false: Only admins/OPs can use colors (recommended).
+         * 
+         * In advanced permission mode, players with eliteessentials.chat.color can also use colors.
+         */
+        public boolean allowPlayerColors = false;
+        
+        /**
+         * Allow regular players to use formatting codes in chat (&l bold, &o italic).
+         * When true: Everyone can use formatting in chat.
+         * When false: Only admins/OPs can use formatting.
+         * 
+         * In advanced permission mode, players with eliteessentials.chat.format can also use formatting.
+         */
+        public boolean allowPlayerFormatting = false;
+        
         /** 
          * Chat format per group.
          * Placeholders: {player}, {displayname}, {message}, {group}
@@ -827,6 +923,25 @@ public class PluginConfig {
         
         /** Number of players to show in /baltop */
         public int baltopLimit = 10;
+        
+        // ==================== VAULTUNLOCKED INTEGRATION ====================
+        
+        /**
+         * Register EliteEssentials as a VaultUnlocked economy provider.
+         * When enabled, other plugins can use VaultUnlocked API to interact with our economy.
+         * Requires VaultUnlocked plugin to be installed.
+         */
+        public boolean vaultUnlockedProvider = true;
+        
+        /**
+         * Use an external economy plugin via VaultUnlocked instead of our internal economy.
+         * When enabled, /wallet, /pay, /baltop will use the external economy.
+         * Requires VaultUnlocked plugin and another economy plugin to be installed.
+         * 
+         * Note: If both vaultUnlockedProvider and useExternalEconomy are true,
+         * useExternalEconomy takes precedence (we consume, not provide).
+         */
+        public boolean useExternalEconomy = false;
     }
     
     // ==================== PLAYTIME REWARDS ====================

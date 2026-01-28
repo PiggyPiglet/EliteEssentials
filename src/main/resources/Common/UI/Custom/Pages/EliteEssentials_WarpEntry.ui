@@ -1,40 +1,47 @@
 $C = "../Common.ui";
 
-Button {
+Group #WarpRow {
   LayoutMode: Top;
-  Anchor: (Left: 2, Right: 2, Bottom: 5, Height: 70, Width: 400);
   Background: $C.@InputBoxBackground;
-  Padding: (Top: 8, Bottom: 8, Left: 10, Right: 10);
-  Style: ButtonStyle(
-    Sounds: $C.@ButtonSounds,
-  );
+  Padding: (Top: 10, Bottom: 10, Left: 15, Right: 15);
+  Anchor: (Bottom: 8);
 
   Group {
-    LayoutMode: Top;
+    LayoutMode: Left;
+    Anchor: (Height: 26);
 
-    Label #WarpName {
-      Style: (
-        FontSize: 16,
-        RenderBold: true,
-        TextColor: #55FFFF,
-        HorizontalAlignment: Center
+    Button #TeleportButton {
+      FlexWeight: 1;
+      Style: ButtonStyle(
+        Sounds: $C.@ButtonSounds
       );
+
+      Group {
+        LayoutMode: Left;
+
+        Label #WarpName {
+          Style: (
+            FontSize: 16,
+            RenderBold: true,
+            TextColor: #55FFFF,
+            VerticalAlignment: Center
+          );
+          Padding: (Right: 10);
+        }
+
+        Label #WarpDescription {
+          Style: (
+            FontSize: 13,
+            TextColor: #AAAAAA,
+            VerticalAlignment: Center
+          );
+        }
+      }
     }
 
-    Label #WarpDescription {
-      Style: (
-        FontSize: 11,
-        TextColor: #AAAAAA,
-        HorizontalAlignment: Center
-      );
-    }
-
-    Label #WarpStatus {
-      Style: (
-        FontSize: 10,
-        TextColor: #FF5555,
-        HorizontalAlignment: Center
-      );
+    $C.@CancelTextButton #DeleteButton {
+      Anchor: (Width: 40, Height: 26);
+      Text: "X";
     }
   }
 }

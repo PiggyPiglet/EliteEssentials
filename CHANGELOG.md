@@ -2,6 +2,54 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.1.3] - 2026-01-26
+
+### Added
+
+**Chat Color/Formatting Restrictions** - Control who can use color codes in chat
+* New config options in `chatFormat` section:
+  - `allowPlayerColors: false` - When false, only admins/OPs can use color codes like &c or &#FF0000
+  - `allowPlayerFormatting: false` - When false, only admins/OPs can use &l (bold), &o (italic), etc.
+* Players without permission will have color/format codes stripped from their messages
+* In advanced permission mode, grant `eliteessentials.chat.color` or `eliteessentials.chat.format` to allow specific players/groups
+* Defaults to restricted (false) - colors are admin-only out of the box
+
+**VaultUnlocked Integration** - Cross-plugin economy support via VaultUnlocked API
+* Register EliteEssentials as an economy provider for other plugins
+* Optionally use external economy plugins instead of internal economy
+* New config options in `economy` section:
+  - `vaultUnlockedProvider: true` - Register as economy provider (default: true)
+  - `useExternalEconomy: false` - Use external economy instead of internal (default: false)
+* When `vaultUnlockedProvider` is enabled:
+  - Other plugins using VaultUnlocked can access EliteEssentials wallets
+  - Supports: getBalance, deposit, withdraw, has, transfer
+* When `useExternalEconomy` is enabled:
+  - `/wallet`, `/pay`, `/baltop` use the external economy
+  - Command costs deduct from external economy
+  - EliteEssentials becomes a consumer instead of provider
+* Reflection-based integration allows building with JVM 21 while running on JVM 25+ servers
+* Graceful fallback: If VaultUnlocked not installed, uses internal economy silently
+
+### Changed
+
+**RTP Command Fix** - Fixed `/rtp` not working for regular players
+* Command sender can be either `PlayerRef` or `Player` depending on context
+* Now properly handles both sender types when detecting console vs player execution
+* Self-RTP (`/rtp` with no args) now works correctly for all players
+
+### Fixed
+
+**StarterKitEvent Thread Safety** - Fixed crash when starter kit event fires
+* `IllegalStateException: Assert not in thread!` error when new players join
+* Event callback now properly executes store operations on the WorldThread
+* Fixes server crash even when kits are disabled in config
+
+### Notes
+
+* VaultUnlocked 2.18.3 for Hytale requires JVM 25+ at runtime (your server runs this)
+* When using `useExternalEconomy`, set `vaultUnlockedProvider: false` to avoid conflicts
+* Compatible economy plugins: TheNewEconomy, EcoTale, DynastyEconomy, and others supporting VaultUnlocked
+
 ## [1.1.2] - 2026-01-25
 
 > <span style="color: rgb(224, 62, 45);"><strong>BACKUP WARNING</strong>: This version includes automatic data migrations that restructure how player data is stored. Before upgrading:</span>

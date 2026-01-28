@@ -1,6 +1,6 @@
 $C = "../Common.ui";
 
-Group #HomeRow {
+Group #WarpRow {
   LayoutMode: Top;
   Background: $C.@InputBoxBackground;
   Padding: (Top: 10, Bottom: 10, Left: 15, Right: 15);
@@ -19,38 +19,24 @@ Group #HomeRow {
       Group {
         LayoutMode: Left;
 
-        Label #HomeName {
+        Label #WarpName {
           Style: (
             FontSize: 16,
             RenderBold: true,
-            TextColor: #55FF55,
+            TextColor: #55FFFF,
             VerticalAlignment: Center
           );
-          Padding: (Right: 15);
+          Padding: (Right: 10);
         }
 
-        Label #HomeWorld {
+        Label #WarpDescription {
           Style: (
-            FontSize: 12,
-            TextColor: #93844c,
-            VerticalAlignment: Center
-          );
-          Padding: (Right: 15);
-        }
-
-        Label #HomeCoords {
-          Style: (
-            FontSize: 12,
+            FontSize: 13,
             TextColor: #AAAAAA,
             VerticalAlignment: Center
           );
         }
       }
-    }
-
-    $C.@CancelTextButton #DeleteButton {
-      Anchor: (Width: 40, Height: 26);
-      Text: "X";
     }
   }
 }

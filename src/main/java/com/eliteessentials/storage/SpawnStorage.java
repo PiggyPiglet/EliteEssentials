@@ -33,8 +33,11 @@ public class SpawnStorage {
 
     public void load() {
         File file = new File(dataFolder, "spawn.json");
+        logger.info("Looking for spawn.json at: " + file.getAbsolutePath());
+        
         if (!file.exists()) {
             spawns = new HashMap<>();
+            logger.warning("spawn.json not found - no spawn points set. Use /setspawn to set spawn locations.");
             return;
         }
 
@@ -44,7 +47,25 @@ public class SpawnStorage {
             if (spawns == null) {
                 spawns = new HashMap<>();
             }
-            logger.info("Loaded spawns for " + spawns.size() + " world(s)");
+            
+            // Check if we got valid data - if the map has entries but they're all null or invalid,
+            // it means we loaded old format as new format (Gson doesn't throw, just returns bad data)
+            boolean hasValidData = false;
+            for (SpawnData spawn : spawns.values()) {
+                if (spawn != null && spawn.world != null) {
+                    hasValidData = true;
+                    break;
+                }
+            }
+            
+            if (!spawns.isEmpty() && !hasValidData) {
+                // Old format was parsed incorrectly - try migration
+                logger.info("Detected old spawn format, attempting migration...");
+                spawns = new HashMap<>();
+                migrateOldFormat(file);
+            } else {
+                logger.info("Loaded spawns for " + spawns.size() + " world(s) from: " + file.getAbsolutePath());
+            }
         } catch (Exception e) {
             // Try to migrate from old format (single SpawnData)
             try {

@@ -20,6 +20,9 @@ public class PlayerFile {
     private long playTime;  // Total play time in seconds
     private double wallet;
     
+    // Admin state
+    private boolean vanished;  // Whether player is in vanish mode
+    
     // Homes: name -> Home
     private Map<String, Home> homes = new LinkedHashMap<>();
     
@@ -46,6 +49,7 @@ public class PlayerFile {
         this.lastSeen = System.currentTimeMillis();
         this.playTime = 0;
         this.wallet = 0.0;
+        this.vanished = false;
     }
     
     // ==================== Core Identity ====================
@@ -117,6 +121,16 @@ public class PlayerFile {
         }
         this.wallet = newBalance;
         return true;
+    }
+    
+    // ==================== Admin State ====================
+    
+    public boolean isVanished() {
+        return vanished;
+    }
+    
+    public void setVanished(boolean vanished) {
+        this.vanished = vanished;
     }
     
     // ==================== Homes ====================

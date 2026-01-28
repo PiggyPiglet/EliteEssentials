@@ -76,6 +76,13 @@ public class HomeSelectionPage extends InteractiveCustomUIPage<HomeSelectionPage
         Map<String, Home> homes = homeService.getHomes(playerId);
         List<Home> homeList = new ArrayList<>(homes.values());
         homeList.sort(Comparator.comparing(Home::getName));
+        
+        // Set dynamic title with count
+        int maxHomes = configManager.getConfig().homes.maxHomes;
+        String title = configManager.getMessage("guiHomesTitle", 
+            "count", String.valueOf(homeList.size()), 
+            "max", String.valueOf(maxHomes));
+        commandBuilder.set("#TitleLabel.Text", title);
 
         if (homeList.isEmpty()) {
             return;
@@ -99,11 +106,18 @@ public class HomeSelectionPage extends InteractiveCustomUIPage<HomeSelectionPage
             // Show world name
             commandBuilder.set(selector + " #HomeWorld.Text", home.getLocation().getWorld());
 
-            // Bind click event
+            // Bind teleport button (the whole row except delete)
             eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
-                selector,
-                EventData.of("Home", home.getName())
+                selector + " #TeleportButton",
+                EventData.of("Home", "T:" + home.getName())
+            );
+            
+            // Bind delete button
+            eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                selector + " #DeleteButton",
+                EventData.of("Home", "D:" + home.getName())
             );
         }
     }
@@ -117,10 +131,19 @@ public class HomeSelectionPage extends InteractiveCustomUIPage<HomeSelectionPage
         UUID playerId = playerRef.getUuid();
         PluginConfig config = configManager.getConfig();
         
-        Optional<Home> homeOpt = homeService.getHome(playerId, data.home);
+        // Check if this is a delete action (D: prefix) or teleport (T: prefix)
+        if (data.home.startsWith("D:")) {
+            String homeName = data.home.substring(2);
+            handleDeleteHome(playerId, homeName);
+            return;
+        }
+        
+        String homeName = data.home.startsWith("T:") ? data.home.substring(2) : data.home;
+        
+        Optional<Home> homeOpt = homeService.getHome(playerId, homeName);
         
         if (homeOpt.isEmpty()) {
-            sendMessage(configManager.getMessage("homeNotFound", "name", data.home), "#FF5555");
+            sendMessage(configManager.getMessage("homeNotFound", "name", homeName), "#FF5555");
             this.close();
             return;
         }
@@ -219,6 +242,76 @@ public class HomeSelectionPage extends InteractiveCustomUIPage<HomeSelectionPage
         }
         
         warmupService.startWarmup(playerRef, currentPos, warmupSeconds, doTeleport, COMMAND_NAME, world, store, ref, false);
+    }
+    
+    private void handleDeleteHome(UUID playerId, String homeName) {
+        Optional<Home> homeOpt = homeService.getHome(playerId, homeName);
+        
+        if (homeOpt.isEmpty()) {
+            sendMessage(configManager.getMessage("homeNotFound", "name", homeName), "#FF5555");
+            return;
+        }
+        
+        // Delete the home
+        HomeService.Result result = homeService.deleteHome(playerId, homeName);
+        
+        if (result == HomeService.Result.SUCCESS) {
+            sendMessage(configManager.getMessage("homeDeleted", "name", homeName), "#55FF55");
+            // Refresh the GUI to show updated list
+            refreshHomeList();
+        } else {
+            sendMessage(configManager.getMessage("homeDeleteFailed"), "#FF5555");
+        }
+    }
+    
+    private void refreshHomeList() {
+        UICommandBuilder cmd = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        
+        UUID playerId = playerRef.getUuid();
+        
+        // Update title with new count
+        Map<String, Home> homes = homeService.getHomes(playerId);
+        int maxHomes = configManager.getConfig().homes.maxHomes;
+        String title = configManager.getMessage("guiHomesTitle", 
+            "count", String.valueOf(homes.size()), 
+            "max", String.valueOf(maxHomes));
+        cmd.set("#TitleLabel.Text", title);
+        
+        // Clear and rebuild home list
+        cmd.clear("#HomeCards");
+        
+        List<Home> homeList = new ArrayList<>(homes.values());
+        homeList.sort(Comparator.comparing(Home::getName));
+        
+        for (int i = 0; i < homeList.size(); i++) {
+            Home home = homeList.get(i);
+            String selector = "#HomeCards[" + i + "]";
+
+            cmd.append("#HomeCards", "Pages/EliteEssentials_HomeEntry.ui");
+            cmd.set(selector + " #HomeName.Text", home.getName());
+            
+            String coords = String.format("%.0f, %.0f, %.0f", 
+                home.getLocation().getX(), 
+                home.getLocation().getY(), 
+                home.getLocation().getZ());
+            cmd.set(selector + " #HomeCoords.Text", coords);
+            cmd.set(selector + " #HomeWorld.Text", home.getLocation().getWorld());
+
+            events.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                selector + " #TeleportButton",
+                EventData.of("Home", "T:" + home.getName())
+            );
+            
+            events.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                selector + " #DeleteButton",
+                EventData.of("Home", "D:" + home.getName())
+            );
+        }
+        
+        this.sendUpdate(cmd, events, false);
     }
 
     private void sendMessage(String message, String color) {

@@ -122,6 +122,16 @@ public final class Permissions {
     public static final String REPAIR_ALL = MISC_CATEGORY + ".repair.all";
     public static final String GROUP_CHAT = MISC_CATEGORY + ".groupchat";
 
+    // ==================== CHAT CATEGORY ====================
+    // eliteessentials.chat.*
+    public static final String CHAT_CATEGORY = NAMESPACE + ".chat";
+    
+    /** Permission to use color codes in chat */
+    public static final String CHAT_COLOR = CHAT_CATEGORY + ".color";
+    
+    /** Permission to use formatting codes (bold, italic) in chat */
+    public static final String CHAT_FORMAT = CHAT_CATEGORY + ".format";
+
     // ==================== KIT CATEGORY ====================
     // eliteessentials.command.kit.*
     public static final String KIT_CATEGORY = COMMAND_BASE + ".kit";
