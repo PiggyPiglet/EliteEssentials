@@ -60,6 +60,9 @@ public final class Permissions {
     // Per-command bypass: eliteessentials.command.tp.bypass.cooldown.<cmd>
     public static final String TP_BYPASS_COOLDOWN_PREFIX = TP_BYPASS_COOLDOWN + ".";
     public static final String TP_BYPASS_WARMUP_PREFIX = TP_BYPASS_WARMUP + ".";
+    
+    // TP cooldown overrides: eliteessentials.command.tp.cooldown.<cmd>.<seconds>
+    public static final String TP_COOLDOWN_PREFIX = TP_CATEGORY + ".cooldown.";
 
     // ==================== WARP CATEGORY ====================
     // eliteessentials.command.warp.*
@@ -319,6 +322,16 @@ public final class Permissions {
      */
     public static String tpBypassWarmup(String command) {
         return TP_BYPASS_WARMUP_PREFIX + command;
+    }
+    
+    /**
+     * Get cooldown override permission for a tp command.
+     * @param command Command name (e.g., "rtp", "back", "tpa")
+     * @param seconds Cooldown in seconds
+     * @return eliteessentials.command.tp.cooldown.<command>.<seconds>
+     */
+    public static String tpCooldown(String command, int seconds) {
+        return TP_COOLDOWN_PREFIX + command + "." + seconds;
     }
 
     // ==================== LEGACY COMPATIBILITY ====================

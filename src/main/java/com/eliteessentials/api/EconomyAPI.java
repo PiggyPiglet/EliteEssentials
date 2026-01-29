@@ -57,10 +57,25 @@ public final class EconomyAPI {
     
     /**
      * Check if we're using an external economy via VaultUnlocked.
+     * Returns true if:
+     * 1. VaultUnlocked integration detected an external economy, OR
+     * 2. Config has useExternalEconomy=true (even if detection hasn't completed yet)
      */
     public static boolean isUsingExternalEconomy() {
+        // First check if VaultUnlocked integration has confirmed external economy
         VaultUnlockedIntegration vault = VaultUnlockedIntegration.get();
-        return vault != null && vault.isUsingExternalEconomy();
+        if (vault != null && vault.isUsingExternalEconomy()) {
+            return true;
+        }
+        
+        // Also check config - if useExternalEconomy is true, we should try to use it
+        // even if detection hasn't completed yet (will fail gracefully)
+        EliteEssentials plugin = EliteEssentials.getInstance();
+        if (plugin != null && plugin.getConfigManager() != null) {
+            return plugin.getConfigManager().getConfig().economy.useExternalEconomy;
+        }
+        
+        return false;
     }
 
     /**

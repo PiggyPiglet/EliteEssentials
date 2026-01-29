@@ -404,7 +404,7 @@ public class EliteEssentials extends JavaPlugin {
         
         // Back command
         if (config.back.enabled) {
-            getCommandRegistry().registerCommand(new HytaleBackCommand(backService));
+            getCommandRegistry().registerCommand(new HytaleBackCommand(backService, cooldownService));
             registeredCommands.append("/back, ");
         }
         
@@ -558,7 +558,8 @@ public class EliteEssentials extends JavaPlugin {
         }
         
         // Economy commands
-        if (config.economy.enabled) {
+        // When useExternalEconomy is true, skip ALL economy commands - let the external plugin handle everything
+        if (config.economy.enabled && !config.economy.useExternalEconomy) {
             getCommandRegistry().registerCommand(new HytaleWalletCommand(configManager, playerService));
             getCommandRegistry().registerCommand(new HytalePayCommand(configManager, playerService));
             getCommandRegistry().registerCommand(new HytaleBaltopCommand(configManager, playerService));

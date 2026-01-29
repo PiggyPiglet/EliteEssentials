@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.logging.Logger;
 
 /**
  * EliteEssentials Home Selection GUI.
@@ -49,7 +48,6 @@ import java.util.logging.Logger;
  */
 public class HomeSelectionPage extends InteractiveCustomUIPage<HomeSelectionPage.HomePageData> {
 
-    private static final Logger logger = Logger.getLogger("EliteEssentials");
     private static final String COMMAND_NAME = "home";
     private static final String ACTION_TELEPORT = "Teleport";
     private static final String ACTION_EDIT = "Edit";

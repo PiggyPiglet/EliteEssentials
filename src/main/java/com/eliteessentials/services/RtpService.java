@@ -2,6 +2,7 @@ package com.eliteessentials.services;
 
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.model.Location;
+import com.eliteessentials.permissions.PermissionService;
 
 import java.util.Map;
 import java.util.Random;
@@ -37,6 +38,7 @@ public class RtpService {
 
     /**
      * Check if a player is on cooldown.
+     * Uses permission-based cooldown overrides if available.
      * 
      * @param playerId Player UUID
      * @return Remaining cooldown in seconds, or 0 if not on cooldown
@@ -46,9 +48,23 @@ public class RtpService {
         if (lastUse == null) return 0;
         
         long elapsed = (System.currentTimeMillis() - lastUse) / 1000;
-        int cooldown = configManager.getRtpCooldown();
+        
+        // Get effective cooldown (checks permission overrides)
+        int cooldown = getEffectiveCooldown(playerId);
         
         return Math.max(0, cooldown - (int) elapsed);
+    }
+    
+    /**
+     * Get the effective cooldown for a player based on permissions.
+     * Checks for permission-based cooldown overrides like eliteessentials.command.tp.cooldown.rtp.300
+     * 
+     * @param playerId Player UUID
+     * @return Effective cooldown in seconds
+     */
+    public int getEffectiveCooldown(UUID playerId) {
+        int defaultCooldown = configManager.getRtpCooldown();
+        return PermissionService.get().getTpCommandCooldown(playerId, "rtp", defaultCooldown);
     }
 
     /**

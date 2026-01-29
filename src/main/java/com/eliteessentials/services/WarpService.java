@@ -185,6 +185,8 @@ public class WarpService {
     /**
      * Get the warp limit for a player based on their permissions/groups.
      * Returns -1 for unlimited.
+     * 
+     * Custom limit values require LuckPerms. Without LuckPerms, config defaults are used.
      */
     public int getWarpLimit(UUID playerId) {
         if (configManager == null) {
@@ -200,20 +202,12 @@ public class WarpService {
                 return -1;
             }
             
-            // Check for specific limit permissions (highest wins)
-            int highestLimit = -1;
-            boolean foundLimit = false;
-            for (int i = 100; i >= 1; i--) {
-                if (PermissionService.get().hasPermission(playerId, Permissions.warpLimit(i))) {
-                    highestLimit = i;
-                    foundLimit = true;
-                    break;
+            // Try to get custom limit from LuckPerms (any value)
+            if (LuckPermsIntegration.isAvailable()) {
+                int lpLimit = getHighestLuckPermsLimit(playerId, Permissions.WARP_LIMIT_PREFIX);
+                if (lpLimit > 0) {
+                    return lpLimit;
                 }
-            }
-            
-            // If found a permission-based limit, use it
-            if (foundLimit) {
-                return highestLimit;
             }
             
             // Check group-based limits from config
@@ -226,6 +220,58 @@ public class WarpService {
         
         // Fall back to global config limit
         return config.maxWarps;
+    }
+    
+    /**
+     * Get the highest limit value from LuckPerms permissions.
+     * Scans for permissions matching the prefix and returns the highest number found.
+     */
+    private int getHighestLuckPermsLimit(UUID playerId, String permissionPrefix) {
+        try {
+            Class<?> providerClass = Class.forName("net.luckperms.api.LuckPermsProvider");
+            java.lang.reflect.Method getMethod = providerClass.getMethod("get");
+            Object luckPerms = getMethod.invoke(null);
+            
+            if (luckPerms == null) return -1;
+            
+            java.lang.reflect.Method getUserManagerMethod = luckPerms.getClass().getMethod("getUserManager");
+            Object userManager = getUserManagerMethod.invoke(luckPerms);
+            
+            java.lang.reflect.Method getUserMethod = userManager.getClass().getMethod("getUser", UUID.class);
+            Object user = getUserMethod.invoke(userManager, playerId);
+            
+            if (user == null) return -1;
+            
+            // Get CachedData -> PermissionData -> PermissionMap
+            java.lang.reflect.Method getCachedDataMethod = user.getClass().getMethod("getCachedData");
+            Object cachedData = getCachedDataMethod.invoke(user);
+            
+            java.lang.reflect.Method getPermissionDataMethod = cachedData.getClass().getMethod("getPermissionData");
+            Object permissionData = getPermissionDataMethod.invoke(cachedData);
+            
+            java.lang.reflect.Method getPermissionMapMethod = permissionData.getClass().getMethod("getPermissionMap");
+            @SuppressWarnings("unchecked")
+            Map<String, Boolean> permMap = (Map<String, Boolean>) getPermissionMapMethod.invoke(permissionData);
+            
+            int highestValue = -1;
+            
+            for (Map.Entry<String, Boolean> entry : permMap.entrySet()) {
+                if (entry.getValue() && entry.getKey().startsWith(permissionPrefix)) {
+                    String valuePart = entry.getKey().substring(permissionPrefix.length());
+                    try {
+                        int value = Integer.parseInt(valuePart);
+                        if (value > highestValue) {
+                            highestValue = value;
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            
+            return highestValue;
+            
+        } catch (Exception e) {
+            return -1;
+        }
     }
     
     /**

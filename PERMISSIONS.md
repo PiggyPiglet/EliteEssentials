@@ -63,6 +63,15 @@ In simple mode, "Admin" means players in the OP group or with `eliteessentials.a
 
 Full granular permission nodes following Hytale best practices: `namespace.category.action`
 
+**Note: Custom Cooldowns and Limits require LuckPerms**
+
+When using advanced permissions mode, custom numeric values for cooldowns and limits (e.g., `eliteessentials.command.home.limit.37` or `eliteessentials.command.tp.cooldown.rtp.1000`) require LuckPerms to be installed. Without LuckPerms, only config default values are used.
+
+- **Cooldowns**: Use any number of seconds (e.g., `.cooldown.1000` for 1000 seconds)
+- **Limits**: Use any number (e.g., `.limit.37` for 37 homes)
+- Lowest cooldown value wins (most favorable to player)
+- Highest limit value wins (most favorable to player)
+
 ## Permission Hierarchy (Advanced Mode)
 
 ```
@@ -90,6 +99,10 @@ eliteessentials
 │   │   │   └── ondeath             # Use /back after death
 │   │   ├── top                     # /top command (Admin)
 │   │   ├── tphere                  # /tphere command (Admin)
+│   │   ├── cooldown                # Cooldown overrides
+│   │   │   ├── rtp.<seconds>       # Custom RTP cooldown
+│   │   │   ├── tpa.<seconds>       # Custom TPA cooldown
+│   │   │   └── back.<seconds>      # Custom back cooldown
 │   │   └── bypass
 │   │       ├── cooldown            # Bypass all tp cooldowns
 │   │       │   ├── rtp             # Bypass RTP cooldown
@@ -187,7 +200,7 @@ eliteessentials
 | `eliteessentials.command.home.sethome` | Set a home location |
 | `eliteessentials.command.home.delhome` | Delete a home |
 | `eliteessentials.command.home.homes` | List your homes (GUI) |
-| `eliteessentials.command.home.limit.<n>` | Max homes (e.g., `.limit.5`) |
+| `eliteessentials.command.home.limit.<n>` | Max homes (any value, requires LuckPerms) |
 | `eliteessentials.command.home.limit.unlimited` | Unlimited homes |
 | `eliteessentials.command.home.bypass.cooldown` | Bypass home cooldown |
 | `eliteessentials.command.home.bypass.warmup` | Bypass home warmup |
@@ -207,10 +220,13 @@ eliteessentials
 | `eliteessentials.command.tp.tphere` | Teleport player to you (Admin) |
 | `eliteessentials.command.tp.bypass.cooldown` | Bypass all tp cooldowns |
 | `eliteessentials.command.tp.bypass.cooldown.rtp` | Bypass RTP cooldown |
-| `eliteessentials.command.tp.bypass.c back cooldown |
+| `eliteessentials.command.tp.bypass.cooldown.back` | Bypass back cooldown |
 | `eliteessentials.command.tp.bypass.cooldown.tpa` | Bypass TPA cooldown |
 | `eliteessentials.command.tp.bypass.warmup` | Bypass all tp warmups |
 | `eliteessentials.command.tp.bypass.warmup.rtp` | Bypass RTP warmup |
+| `eliteessentials.command.tp.cooldown.rtp.<seconds>` | Custom RTP cooldown (any value, requires LuckPerms) |
+| `eliteessentials.command.tp.cooldown.tpa.<seconds>` | Custom TPA cooldown (any value, requires LuckPerms) |
+| `eliteessentials.command.tp.cooldown.back.<seconds>` | Custom back cooldown (any value, requires LuckPerms) |
 
 ### Warp Commands
 
@@ -218,15 +234,15 @@ eliteessentials
 |------------|-------------|
 | `eliteessentials.command.warp.list` | Use /warp (GUI) and /warp list |
 | `eliteessentials.command.warp.use` | Teleport to ALL public warps |
-| `eliteessentirp |
+| `eliteessentials.command.warp.<warpname>` | Access specific warp |
 | `eliteessentials.command.warp.set` | Create warps (Admin) |
 | `eliteessentials.command.warp.delete` | Delete warps (Admin) |
 | `eliteessentials.command.warp.admin` | Warp administration (Admin) |
 | `eliteessentials.command.warp.setperm` | Set warp permissions (Admin) |
 | `eliteessentials.command.warp.setdesc` | Set warp descriptions (Admin) |
-| `eliteessentials.command.warp.limit.<n>` | Max warps player can create |
+| `eliteessentials.command.warp.limit.<n>` | Max warps player can create (any value, requires LuckPerms) |
 | `eliteessentials.command.warp.limit.unlimited` | Unlimited warp creation |
-ials.command.warp.bypass.cooldown` | Bypass warp cooldown |
+| `eliteessentials.command.warp.bypass.cooldown` | Bypass warp cooldown |
 | `eliteessentials.command.warp.bypass.warmup` | Bypass warp warmup |
 
 ### Spawn Commands
@@ -260,16 +276,20 @@ ials.command.warp.bypass.cooldown` | Bypass warp cooldown |
 | `eliteessentials.command.misc.rules` | View server rules |
 | `eliteessentials.command.misc.discord` | View discord info |
 | `eliteessentials.command.misc.list` | View online players |
-| `eliteessentials.coble commands |
+| `eliteessentials.command.misc.eehelp` | View available commands |
 | `eliteessentials.command.misc.seen` | Check player info |
 | `eliteessentials.command.misc.god` | Toggle god mode (Admin) |
 | `eliteessentials.command.misc.heal` | Heal to full health (Admin) |
 | `eliteessentials.command.misc.heal.bypass.cooldown` | Bypass heal cooldown |
-| `eliteessentials.command.misc.heal.cooldown.<seconds>` | Custom heal cooldown |
+| `eliteessentials.command.misc.heal.cooldown.<seconds>` | Custom heal cooldown (any value, requires LuckPerms) |
 | `eliteessentials.command.misc.fly` | Toggle flight mode (Admin) |
 | `eliteessentials.command.misc.flyspeed` | Set fly speed (Admin) |
 | `eliteessentials.command.misc.broadcast` | Server announcements (Admin) |
 | `eliteessentials.command.misc.clearinv` | Clear inventory (Admin) |
+| `eliteessentials.command.misc.repair` | Repair items (Admin) |
+| `eliteessentials.command.misc.repair.all` | Repair all items (Admin) |
+| `eliteessentials.command.misc.repair.bypass.cooldown` | Bypass repair cooldown |
+| `eliteessentials.command.misc.repair.cooldown.<seconds>` | Custom repair cooldown (any value, requires LuckPerms) |
 | `eliteessentials.command.misc.sleeppercent` | Set sleep percentage (Admin) |
 
 ### Economy Commands
@@ -279,7 +299,7 @@ ials.command.warp.bypass.cooldown` | Bypass warp cooldown |
 | `eliteessentials.command.economy.wallet` | View own balance |
 | `eliteessentials.command.economy.wallet.others` | View other player balance |
 | `eliteessentials.command.economy.wallet.admin` | Modify balances (Admin) |
- `eliteessentials.command.economy.pay` | Send money to players |
+| `eliteessentials.command.economy.pay` | Send money to players |
 | `eliteessentials.command.economy.baltop` | View richest players |
 
 ### Admin Permissions
@@ -329,7 +349,7 @@ ials.command.warp.bypass.cooldown` | Bypass warp cooldown |
 ```
 eliteessentials.command.home.limit.10
 eliteessentials.command.home.bypass.cooldown
-eliteessentials.command.tp.bypass.cooldown.rtp
+eliteessentials.command.tp.cooldown.rtp.300
 eliteessentials.command.warp.bypass.cooldown
 eliteessentials.command.kit.bypass.cooldown
 eliteessentials.bypass.cost

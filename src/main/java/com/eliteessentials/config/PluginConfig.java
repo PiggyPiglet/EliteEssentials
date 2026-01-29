@@ -404,7 +404,7 @@ public class PluginConfig {
          * Per-world RTP range configuration.
          * Key = world name (case-sensitive), Value = WorldRtpRange with min/max for that world.
          * If a world is not in this map, it uses the default minRange/maxRange above.
-         * Example: {"nether": {minRange: 50, maxRange: 2000}, "end": {minRange: 100, maxRange: 1000}}
+         * Example: {"explore": {minRange: 500, maxRange: 10000}, "hub": {minRange: 50, maxRange: 500}}
          */
         public Map<String, WorldRtpRange> worldRanges = createDefaultWorldRanges();
         
@@ -435,8 +435,8 @@ public class PluginConfig {
         private static Map<String, WorldRtpRange> createDefaultWorldRanges() {
             Map<String, WorldRtpRange> ranges = new HashMap<>();
             // Example configurations - server owners can customize these
-            // ranges.put("nether", new WorldRtpRange(50, 2000));
-            // ranges.put("end", new WorldRtpRange(100, 1000));
+            // ranges.put("explore", new WorldRtpRange(500, 10000));
+            // ranges.put("hub", new WorldRtpRange(50, 500));
             return ranges;
         }
         
@@ -574,6 +574,15 @@ public class PluginConfig {
          * When false (default): Players spawn at the world's default spawn location.
          */
         public boolean teleportOnFirstJoin = true;
+        
+        /**
+         * Teleport ALL players to /setspawn location on every login.
+         * When true: Every player is teleported to spawn when they join the server,
+         * regardless of which world they logged out in.
+         * When false (default): Players spawn where they logged out.
+         * Note: Uses mainWorld spawn when perWorld=false, or current world spawn when perWorld=true.
+         */
+        public boolean teleportOnEveryLogin = false;
     }
 
     // ==================== WARPS ====================
@@ -990,7 +999,11 @@ public class PluginConfig {
         
         /**
          * Use an external economy plugin via VaultUnlocked instead of our internal economy.
-         * When enabled, /wallet, /pay, /baltop will use the external economy.
+         * When enabled, /wallet and /baltop will use the external economy.
+         * 
+         * IMPORTANT: When this is true, EliteEssentials will NOT register /eco and /pay commands
+         * to avoid conflicts with external economy plugins (like Ecotale) that use the same names.
+         * 
          * Requires VaultUnlocked plugin and another economy plugin to be installed.
          * 
          * Note: If both vaultUnlockedProvider and useExternalEconomy are true,

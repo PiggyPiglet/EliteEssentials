@@ -15,8 +15,8 @@ import java.util.logging.Logger;
 /**
  * Service for managing player homes.
  * Supports permission-based home limits via:
- * - eliteessentials.limit.homes.<number> (e.g., eliteessentials.limit.homes.5)
- * - eliteessentials.limit.homes.unlimited
+ * - eliteessentials.command.home.limit.<number> (1-20, 40, 60, 80, 100)
+ * - eliteessentials.command.home.limit.unlimited
  */
 public class HomeService {
 

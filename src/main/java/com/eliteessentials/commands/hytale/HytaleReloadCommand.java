@@ -60,9 +60,11 @@ public class HytaleReloadCommand extends CommandBase {
         if ("reload".equalsIgnoreCase(action)) {
             handleReload(ctx);
         } else if ("migration".equalsIgnoreCase(action)) {
-            ctx.sendMessage(Message.raw("Usage: /ee migration <essentialscore|hyssentials>").color("#FFAA00"));
+            ctx.sendMessage(Message.raw("Usage: /eemigration <essentialscore|hyssentials|essentialsplus|homesplus>").color("#FFAA00"));
             ctx.sendMessage(Message.raw("  essentialscore - Import warps, kits, and homes from nhulston's EssentialsCore").color("#AAAAAA"));
             ctx.sendMessage(Message.raw("  hyssentials - Import homes and warps from Hyssentials").color("#AAAAAA"));
+            ctx.sendMessage(Message.raw("  essentialsplus - Import warps, kits, and homes from fof1092's EssentialsPlus").color("#AAAAAA"));
+            ctx.sendMessage(Message.raw("  homesplus - Import homes from HomesPlus").color("#AAAAAA"));
         } else {
             ctx.sendMessage(Message.raw("Unknown action. Available: reload, migration").color("#FF5555"));
         }
@@ -86,6 +88,12 @@ public class HytaleReloadCommand extends CommandBase {
         try {
             EliteEssentials.getInstance().reloadConfig();
             ctx.sendMessage(Message.raw("EliteEssentials configuration reloaded!").color("#55FF55"));
+            
+            // Retry external economy detection if configured
+            var vaultIntegration = EliteEssentials.getInstance().getVaultUnlockedIntegration();
+            if (vaultIntegration != null && vaultIntegration.retryExternalEconomy()) {
+                ctx.sendMessage(Message.raw("VaultUnlocked: Now using external economy!").color("#55FF55"));
+            }
         } catch (Exception e) {
             ctx.sendMessage(Message.raw("Failed to reload configuration: " + e.getMessage()).color("#FF5555"));
         }

@@ -42,6 +42,8 @@ public class VaultUnlockedIntegration {
     private Class<?> responseTypeClass;
     private Object servicesManager;
     
+    private static final int EXTERNAL_ECONOMY_CHECK_DELAY_SECONDS = 30;
+    
     public VaultUnlockedIntegration(ConfigManager configManager, PlayerService playerService) {
         this.configManager = configManager;
         this.playerService = playerService;
@@ -66,16 +68,22 @@ public class VaultUnlockedIntegration {
         
         // Check if we should use external economy
         if (config.useExternalEconomy) {
+            // Try immediately first
             if (tryUseExternalEconomy()) {
                 usingExternalEconomy = true;
                 logger.info("[VaultUnlocked] Using external economy via VaultUnlocked.");
                 return; // Don't register as provider if using external
             } else {
-                logger.warning("[VaultUnlocked] useExternalEconomy enabled but no external economy found. Using internal economy.");
+                // External economy not found yet - schedule a delayed retry
+                // Other economy plugins (like Ecotale) may register after us during server startup
+                logger.info("[VaultUnlocked] External economy not found yet. Will retry in " + EXTERNAL_ECONOMY_CHECK_DELAY_SECONDS + " seconds...");
+                logger.info("[VaultUnlocked] (Use /ee reload to manually retry external economy detection)");
+                scheduleExternalEconomyRetry();
+                return; // Don't register as provider yet - wait for retry
             }
         }
         
-        // Register as economy provider
+        // Register as economy provider (only if not using external)
         if (config.vaultUnlockedProvider) {
             if (registerAsProvider()) {
                 registeredAsProvider = true;
@@ -84,6 +92,64 @@ public class VaultUnlockedIntegration {
                 logger.warning("[VaultUnlocked] Failed to register as economy provider.");
             }
         }
+    }
+    
+    /**
+     * Retry external economy detection. Can be called manually via /ee reload.
+     * @return true if external economy was found and is now being used
+     */
+    public boolean retryExternalEconomy() {
+        if (!vaultUnlockedAvailable) {
+            return false;
+        }
+        
+        var config = configManager.getConfig().economy;
+        if (!config.useExternalEconomy) {
+            return false;
+        }
+        
+        if (usingExternalEconomy) {
+            return true; // Already using external
+        }
+        
+        if (tryUseExternalEconomy()) {
+            usingExternalEconomy = true;
+            logger.info("[VaultUnlocked] Found external economy! Now using external economy.");
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Schedule a delayed retry to find external economy.
+     * This handles the case where economy plugins load after EliteEssentials.
+     */
+    private void scheduleExternalEconomyRetry() {
+        new Thread(() -> {
+            try {
+                Thread.sleep(EXTERNAL_ECONOMY_CHECK_DELAY_SECONDS * 1000L);
+                
+                if (tryUseExternalEconomy()) {
+                    usingExternalEconomy = true;
+                    logger.info("[VaultUnlocked] Found external economy on retry! Using external economy.");
+                } else {
+                    logger.warning("[VaultUnlocked] External economy still not found after " + EXTERNAL_ECONOMY_CHECK_DELAY_SECONDS + "s.");
+                    logger.warning("[VaultUnlocked] Run '/ee reload' after all plugins have loaded to retry detection.");
+                    
+                    // Fall back to registering as provider if configured
+                    var config = configManager.getConfig().economy;
+                    if (config.vaultUnlockedProvider && !registeredAsProvider) {
+                        if (registerAsProvider()) {
+                            registeredAsProvider = true;
+                            logger.info("[VaultUnlocked] Registered EliteEssentials as economy provider (fallback).");
+                        }
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "EE-VaultUnlocked-Retry").start();
     }
     
     /**
@@ -112,25 +178,85 @@ public class VaultUnlockedIntegration {
      */
     private boolean tryUseExternalEconomy() {
         try {
-            Object economy = servicesManager.getClass()
-                .getMethod("economyObj")
-                .invoke(servicesManager);
-            
-            if (economy != null) {
-                // Verify it's not our own provider
-                if (economy.getClass().getName().contains("eliteessentials")) {
-                    logger.info("[VaultUnlocked] Only our own economy is registered - using internal.");
-                    return false;
-                }
-                
-                String name = (String) economy.getClass().getMethod("getName").invoke(economy);
-                logger.info("[VaultUnlocked] Found external economy: " + name);
-                return true;
+            if (configManager.isDebugEnabled()) {
+                logger.info("[VaultUnlocked] Checking for external economy...");
+                logger.info("[VaultUnlocked] ServicesManager class: " + servicesManager.getClass().getName());
             }
             
-            return false;
+            // Try economyObj() - the primary method
+            Object economy = null;
+            try {
+                economy = servicesManager.getClass()
+                    .getMethod("economyObj")
+                    .invoke(servicesManager);
+            } catch (NoSuchMethodException e) {
+                if (configManager.isDebugEnabled()) {
+                    logger.info("[VaultUnlocked] economyObj() method not found, trying alternatives...");
+                }
+            }
+            
+            // Try getEconomy() as alternative
+            if (economy == null) {
+                try {
+                    economy = servicesManager.getClass()
+                        .getMethod("getEconomy")
+                        .invoke(servicesManager);
+                } catch (NoSuchMethodException e) {
+                    // Ignore
+                }
+            }
+            
+            // Try economy() as another alternative
+            if (economy == null) {
+                try {
+                    economy = servicesManager.getClass()
+                        .getMethod("economy")
+                        .invoke(servicesManager);
+                } catch (NoSuchMethodException e) {
+                    // Ignore
+                }
+            }
+            
+            if (economy == null) {
+                logger.info("[VaultUnlocked] No economy provider registered with VaultUnlocked.");
+                return false;
+            }
+            
+            // Verify it's not our own provider
+            String className = economy.getClass().getName();
+            if (configManager.isDebugEnabled()) {
+                logger.info("[VaultUnlocked] Found economy class: " + className);
+            }
+            
+            if (className.contains("eliteessentials") || className.contains("$Proxy")) {
+                // Check if it's our proxy by trying to get the name
+                try {
+                    String name = (String) economy.getClass().getMethod("getName").invoke(economy);
+                    if ("EliteEssentials".equals(name)) {
+                        logger.info("[VaultUnlocked] Only our own economy is registered - using internal.");
+                        return false;
+                    }
+                } catch (Exception e) {
+                    // Ignore
+                }
+            }
+            
+            String name = (String) economy.getClass().getMethod("getName").invoke(economy);
+            boolean enabled = (Boolean) economy.getClass().getMethod("isEnabled").invoke(economy);
+            
+            logger.info("[VaultUnlocked] Found external economy: " + name + " (enabled: " + enabled + ")");
+            
+            if (!enabled) {
+                logger.warning("[VaultUnlocked] External economy '" + name + "' is not enabled.");
+                return false;
+            }
+            
+            return true;
         } catch (Exception e) {
             logger.warning("[VaultUnlocked] Error checking for external economy: " + e.getMessage());
+            if (configManager.isDebugEnabled()) {
+                e.printStackTrace();
+            }
             return false;
         }
     }
@@ -355,91 +481,160 @@ public class VaultUnlockedIntegration {
     // ==================== EXTERNAL ECONOMY ACCESS ====================
     
     /**
+     * Check if external economy should be used.
+     * Returns true if either the detection succeeded OR config says to use external.
+     */
+    private boolean shouldUseExternalEconomy() {
+        if (usingExternalEconomy) return true;
+        
+        // Also check config - allows usage even before detection completes
+        return configManager.getConfig().economy.useExternalEconomy && vaultUnlockedAvailable;
+    }
+    
+    /**
      * Get balance from external economy.
+     * VaultUnlocked 2.x API requires plugin name as first parameter.
      */
     public double getExternalBalance(UUID playerId) {
-        if (!usingExternalEconomy) return 0.0;
+        if (!shouldUseExternalEconomy()) return 0.0;
         
         try {
             Object economy = getExternalEconomy();
-            if (economy == null) return 0.0;
+            if (economy == null) {
+                logger.warning("[VaultUnlocked] getExternalBalance: economy object is null");
+                return 0.0;
+            }
             
+            // VaultUnlocked 2.x API: getBalance(String pluginName, UUID playerId)
+            // Use "EliteEssentials" as the plugin identifier
             Object result = economy.getClass()
-                .getMethod("getBalance", UUID.class)
-                .invoke(economy, playerId);
+                .getMethod("getBalance", String.class, UUID.class)
+                .invoke(economy, "EliteEssentials", playerId);
+            
+            if (configManager.isDebugEnabled()) {
+                logger.info("[VaultUnlocked] getBalance result: " + result);
+            }
             
             if (result instanceof BigDecimal) {
                 return ((BigDecimal) result).doubleValue();
+            } else if (result instanceof Number) {
+                return ((Number) result).doubleValue();
             }
             return 0.0;
         } catch (Exception e) {
             logger.warning("[VaultUnlocked] Error getting external balance: " + e.getMessage());
+            if (configManager.isDebugEnabled()) {
+                e.printStackTrace();
+            }
             return 0.0;
         }
     }
     
     /**
      * Check if player has amount in external economy.
+     * VaultUnlocked 2.x API requires plugin name as first parameter.
      */
     public boolean externalHas(UUID playerId, double amount) {
-        if (!usingExternalEconomy) return false;
+        if (!shouldUseExternalEconomy()) return false;
         
         try {
             Object economy = getExternalEconomy();
             if (economy == null) return false;
             
+            // VaultUnlocked 2.x API: has(String pluginName, UUID playerId, BigDecimal amount)
             Object result = economy.getClass()
-                .getMethod("has", UUID.class, BigDecimal.class)
-                .invoke(economy, playerId, BigDecimal.valueOf(amount));
+                .getMethod("has", String.class, UUID.class, BigDecimal.class)
+                .invoke(economy, "EliteEssentials", playerId, BigDecimal.valueOf(amount));
             
             return Boolean.TRUE.equals(result);
         } catch (Exception e) {
             logger.warning("[VaultUnlocked] Error checking external balance: " + e.getMessage());
-            return false;
+            // Fall back to balance check
+            return getExternalBalance(playerId) >= amount;
         }
     }
     
     /**
      * Withdraw from external economy.
+     * VaultUnlocked 2.x API requires plugin name as first parameter.
+     * EconomyResponse has: transactionSuccess() method, and amount/balance/errorMessage fields.
      */
     public boolean externalWithdraw(UUID playerId, double amount) {
-        if (!usingExternalEconomy) return false;
+        if (!shouldUseExternalEconomy()) return false;
         
         try {
             Object economy = getExternalEconomy();
             if (economy == null) return false;
             
+            // VaultUnlocked 2.x API: withdraw(String pluginName, UUID playerId, BigDecimal amount)
             Object response = economy.getClass()
-                .getMethod("withdraw", UUID.class, BigDecimal.class)
-                .invoke(economy, playerId, BigDecimal.valueOf(amount));
+                .getMethod("withdraw", String.class, UUID.class, BigDecimal.class)
+                .invoke(economy, "EliteEssentials", playerId, BigDecimal.valueOf(amount));
             
-            // Check if transaction was successful
-            Object responseType = response.getClass().getMethod("type").invoke(response);
-            return "SUCCESS".equals(responseType.toString());
+            // EconomyResponse.transactionSuccess() returns boolean
+            Object success = response.getClass().getMethod("transactionSuccess").invoke(response);
+            
+            if (configManager.isDebugEnabled()) {
+                // Access fields via reflection: amount, balance, errorMessage
+                try {
+                    var amountField = response.getClass().getField("amount");
+                    var balanceField = response.getClass().getField("balance");
+                    logger.info("[VaultUnlocked] Withdraw response: success=" + success + 
+                        ", amount=" + amountField.get(response) + 
+                        ", balance=" + balanceField.get(response));
+                } catch (NoSuchFieldException e) {
+                    logger.info("[VaultUnlocked] Withdraw response: success=" + success);
+                }
+            }
+            
+            return Boolean.TRUE.equals(success);
         } catch (Exception e) {
             logger.warning("[VaultUnlocked] Error withdrawing from external economy: " + e.getMessage());
+            if (configManager.isDebugEnabled()) {
+                e.printStackTrace();
+            }
             return false;
         }
     }
     
     /**
      * Deposit to external economy.
+     * VaultUnlocked 2.x API requires plugin name as first parameter.
+     * EconomyResponse has: transactionSuccess() method, and amount/balance/errorMessage fields.
      */
     public boolean externalDeposit(UUID playerId, double amount) {
-        if (!usingExternalEconomy) return false;
+        if (!shouldUseExternalEconomy()) return false;
         
         try {
             Object economy = getExternalEconomy();
             if (economy == null) return false;
             
+            // VaultUnlocked 2.x API: deposit(String pluginName, UUID playerId, BigDecimal amount)
             Object response = economy.getClass()
-                .getMethod("deposit", UUID.class, BigDecimal.class)
-                .invoke(economy, playerId, BigDecimal.valueOf(amount));
+                .getMethod("deposit", String.class, UUID.class, BigDecimal.class)
+                .invoke(economy, "EliteEssentials", playerId, BigDecimal.valueOf(amount));
             
-            Object responseType = response.getClass().getMethod("type").invoke(response);
-            return "SUCCESS".equals(responseType.toString());
+            // EconomyResponse.transactionSuccess() returns boolean
+            Object success = response.getClass().getMethod("transactionSuccess").invoke(response);
+            
+            if (configManager.isDebugEnabled()) {
+                try {
+                    var amountField = response.getClass().getField("amount");
+                    var balanceField = response.getClass().getField("balance");
+                    logger.info("[VaultUnlocked] Deposit response: success=" + success + 
+                        ", amount=" + amountField.get(response) + 
+                        ", balance=" + balanceField.get(response));
+                } catch (NoSuchFieldException e) {
+                    logger.info("[VaultUnlocked] Deposit response: success=" + success);
+                }
+            }
+            
+            return Boolean.TRUE.equals(success);
         } catch (Exception e) {
             logger.warning("[VaultUnlocked] Error depositing to external economy: " + e.getMessage());
+            if (configManager.isDebugEnabled()) {
+                e.printStackTrace();
+            }
             return false;
         }
     }

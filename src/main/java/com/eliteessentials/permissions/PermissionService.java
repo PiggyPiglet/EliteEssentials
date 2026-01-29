@@ -2,6 +2,7 @@ package com.eliteessentials.permissions;
 
 import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
+import com.eliteessentials.integration.LuckPermsIntegration;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -212,12 +213,13 @@ public class PermissionService {
 
     /**
      * Get the maximum number of homes a player can have based on permissions.
-     * Checks permissions like eliteessentials.limit.homes.5, eliteessentials.limit.homes.10, etc.
-     * Returns the highest limit found, or the config default if no permission is set.
      * 
-     * Note: We check common limit values since Hytale's PermissionsModule doesn't expose
-     * a way to enumerate all permissions a user has. Server admins should use standard
-     * limit values (1, 2, 3, 5, 10, 15, 20, 25, 50, 100) for best compatibility.
+     * Priority:
+     * 1. Unlimited permission (returns Integer.MAX_VALUE)
+     * 2. LuckPerms permission-based limit (any value via eliteessentials.command.home.limit.<number>)
+     * 3. Config default
+     * 
+     * Note: Custom limit values require LuckPerms. Without LuckPerms, only config default is used.
      */
     public int getMaxHomes(UUID playerId) {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
@@ -228,33 +230,115 @@ public class PermissionService {
             return Integer.MAX_VALUE;
         }
         
-        // Check for specific limit permissions (common values)
-        // We check from highest to lowest and return the first match for efficiency
-        int[] commonLimits = {100, 50, 25, 20, 15, 10, 5, 3, 2, 1};
-        
-        for (int limit : commonLimits) {
-            if (hasPermission(playerId, Permissions.homeLimit(limit))) {
-                return limit;
+        // Try to get custom limit from LuckPerms (returns highest value found)
+        if (LuckPermsIntegration.isAvailable()) {
+            int lpLimit = getHighestPermissionValue(playerId, Permissions.HOME_LIMIT_PREFIX);
+            if (lpLimit > 0) {
+                return lpLimit;
             }
         }
         
         // No specific limit permission found, return config default
         return defaultMax;
     }
+    
+    /**
+     * Get the highest numeric value from a permission node pattern.
+     * Used for limits where higher is better (e.g., home limits).
+     * 
+     * @param playerId Player UUID
+     * @param permissionPrefix Permission prefix to search for
+     * @return The highest value found, or -1 if not found
+     */
+    private int getHighestPermissionValue(UUID playerId, String permissionPrefix) {
+        if (!LuckPermsIntegration.isAvailable()) {
+            return -1;
+        }
+        
+        // Use reflection to call a modified version that returns highest instead of lowest
+        try {
+            Object[] lpObjects = getLuckPermsObjectsViaReflection(playerId);
+            if (lpObjects == null) {
+                return -1;
+            }
+            
+            Object user = lpObjects[2];
+            
+            // Get CachedData -> PermissionData -> PermissionMap
+            java.lang.reflect.Method getCachedDataMethod = user.getClass().getMethod("getCachedData");
+            Object cachedData = getCachedDataMethod.invoke(user);
+            
+            java.lang.reflect.Method getPermissionDataMethod = cachedData.getClass().getMethod("getPermissionData");
+            Object permissionData = getPermissionDataMethod.invoke(cachedData);
+            
+            java.lang.reflect.Method getPermissionMapMethod = permissionData.getClass().getMethod("getPermissionMap");
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Boolean> permMap = (java.util.Map<String, Boolean>) getPermissionMapMethod.invoke(permissionData);
+            
+            int highestValue = -1;
+            
+            for (java.util.Map.Entry<String, Boolean> entry : permMap.entrySet()) {
+                if (entry.getValue() && entry.getKey().startsWith(permissionPrefix)) {
+                    String valuePart = entry.getKey().substring(permissionPrefix.length());
+                    try {
+                        int value = Integer.parseInt(valuePart);
+                        if (value > highestValue) {
+                            highestValue = value;
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            
+            return highestValue;
+            
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+    
+    /**
+     * Helper to get LuckPerms objects via reflection (mirrors LuckPermsIntegration.getLuckPermsObjects)
+     */
+    private Object[] getLuckPermsObjectsViaReflection(UUID playerId) {
+        try {
+            Class<?> providerClass = Class.forName("net.luckperms.api.LuckPermsProvider");
+            java.lang.reflect.Method getMethod = providerClass.getMethod("get");
+            Object luckPerms = getMethod.invoke(null);
+            
+            if (luckPerms == null) return null;
+            
+            java.lang.reflect.Method getUserManagerMethod = luckPerms.getClass().getMethod("getUserManager");
+            Object userManager = getUserManagerMethod.invoke(luckPerms);
+            
+            java.lang.reflect.Method getUserMethod = userManager.getClass().getMethod("getUser", UUID.class);
+            Object user = getUserMethod.invoke(userManager, playerId);
+            
+            if (user == null) {
+                java.lang.reflect.Method loadUserMethod = userManager.getClass().getMethod("loadUser", UUID.class);
+                Object completableFuture = loadUserMethod.invoke(userManager, playerId);
+                java.lang.reflect.Method joinMethod = completableFuture.getClass().getMethod("join");
+                user = joinMethod.invoke(completableFuture);
+            }
+            
+            if (user == null) return null;
+            
+            return new Object[] { luckPerms, userManager, user };
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     // ==================== HEAL COOLDOWN ====================
 
     /**
      * Get the heal cooldown for a player based on permissions.
-     * Checks for permission-based cooldowns like eliteessentials.command.misc.heal.cooldown.300
      * 
      * Priority:
      * 1. Bypass permission (returns 0)
-     * 2. Permission-based cooldown (heal.cooldown.<seconds>)
+     * 2. LuckPerms permission-based cooldown (any value via eliteessentials.command.misc.heal.cooldown.<seconds>)
      * 3. Config default
      * 
-     * Note: We check common cooldown values. Server admins should use standard
-     * values (30, 60, 120, 180, 300, 600, 900, 1800, 3600) for best compatibility.
+     * Note: Custom cooldown values require LuckPerms. Without LuckPerms, only config default is used.
      */
     public int getHealCooldown(UUID playerId) {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
@@ -265,14 +349,11 @@ public class PermissionService {
             return 0;
         }
         
-        // Check for specific cooldown permissions (common values in seconds)
-        // We check from lowest to highest and return the first match
-        // This way groups with lower cooldowns get priority
-        int[] commonCooldowns = {30, 60, 120, 180, 300, 600, 900, 1800, 3600};
-        
-        for (int cooldown : commonCooldowns) {
-            if (hasPermission(playerId, Permissions.healCooldown(cooldown))) {
-                return cooldown;
+        // Try to get custom cooldown from LuckPerms
+        if (LuckPermsIntegration.isAvailable()) {
+            int lpCooldown = LuckPermsIntegration.getInheritedPermissionValue(playerId, Permissions.HEAL_COOLDOWN_PREFIX);
+            if (lpCooldown >= 0) {
+                return lpCooldown;
             }
         }
         
@@ -288,8 +369,10 @@ public class PermissionService {
      * 
      * Priority:
      * 1. Bypass permission (returns 0)
-     * 2. Permission-based cooldown (<command>.cooldown.<seconds>)
+     * 2. LuckPerms permission-based cooldown (any value)
      * 3. Config default
+     * 
+     * Note: Custom cooldown values require LuckPerms. Without LuckPerms, only config default is used.
      * 
      * @param playerId Player UUID
      * @param commandName Command name (god, fly, repair, clearinv, top)
@@ -299,28 +382,28 @@ public class PermissionService {
     public int getCommandCooldown(UUID playerId, String commandName, int defaultCooldown) {
         // Get bypass and cooldown prefix based on command
         String bypassPermission;
-        java.util.function.IntFunction<String> cooldownPermissionFunc;
+        String cooldownPrefix;
         
         switch (commandName.toLowerCase()) {
             case "god":
                 bypassPermission = Permissions.GOD_BYPASS_COOLDOWN;
-                cooldownPermissionFunc = Permissions::godCooldown;
+                cooldownPrefix = Permissions.GOD_COOLDOWN_PREFIX;
                 break;
             case "fly":
                 bypassPermission = Permissions.FLY_BYPASS_COOLDOWN;
-                cooldownPermissionFunc = Permissions::flyCooldown;
+                cooldownPrefix = Permissions.FLY_COOLDOWN_PREFIX;
                 break;
             case "repair":
                 bypassPermission = Permissions.REPAIR_BYPASS_COOLDOWN;
-                cooldownPermissionFunc = Permissions::repairCooldown;
+                cooldownPrefix = Permissions.REPAIR_COOLDOWN_PREFIX;
                 break;
             case "clearinv":
                 bypassPermission = Permissions.CLEARINV_BYPASS_COOLDOWN;
-                cooldownPermissionFunc = Permissions::clearinvCooldown;
+                cooldownPrefix = Permissions.CLEARINV_COOLDOWN_PREFIX;
                 break;
             case "top":
                 bypassPermission = Permissions.TOP_BYPASS_COOLDOWN;
-                cooldownPermissionFunc = Permissions::topCooldown;
+                cooldownPrefix = Permissions.TOP_COOLDOWN_PREFIX;
                 break;
             case "heal":
                 // Use existing heal method for consistency
@@ -335,12 +418,53 @@ public class PermissionService {
             return 0;
         }
         
-        // Check for specific cooldown permissions (common values in seconds)
-        int[] commonCooldowns = {30, 60, 120, 180, 300, 600, 900, 1800, 3600};
+        // Try to get custom cooldown from LuckPerms
+        if (LuckPermsIntegration.isAvailable()) {
+            int lpCooldown = LuckPermsIntegration.getInheritedPermissionValue(playerId, cooldownPrefix);
+            if (lpCooldown >= 0) {
+                return lpCooldown;
+            }
+        }
         
-        for (int cooldown : commonCooldowns) {
-            if (hasPermission(playerId, cooldownPermissionFunc.apply(cooldown))) {
-                return cooldown;
+        // No specific cooldown permission found, return config default
+        return defaultCooldown;
+    }
+
+    // ==================== TP COMMAND COOLDOWN ====================
+
+    /**
+     * Get the cooldown for a teleport command based on permissions.
+     * Supports: rtp, tpa, tpahere, back
+     * 
+     * Priority:
+     * 1. Bypass permission (returns 0)
+     * 2. LuckPerms permission-based cooldown (any value via eliteessentials.command.tp.cooldown.<cmd>.<seconds>)
+     * 3. Config default
+     * 
+     * Note: Custom cooldown values require LuckPerms. Without LuckPerms, only config default is used.
+     * 
+     * @param playerId Player UUID
+     * @param commandName Command name (rtp, tpa, tpahere, back)
+     * @param defaultCooldown Default cooldown from config
+     * @return Effective cooldown in seconds
+     */
+    public int getTpCommandCooldown(UUID playerId, String commandName, int defaultCooldown) {
+        // Check for bypass permission first
+        if (hasPermission(playerId, Permissions.tpBypassCooldown(commandName))) {
+            return 0;
+        }
+        
+        // Also check global TP bypass
+        if (hasPermission(playerId, Permissions.TP_BYPASS_COOLDOWN)) {
+            return 0;
+        }
+        
+        // Try to get custom cooldown from LuckPerms
+        if (LuckPermsIntegration.isAvailable()) {
+            String cooldownPrefix = Permissions.TP_COOLDOWN_PREFIX + commandName + ".";
+            int lpCooldown = LuckPermsIntegration.getInheritedPermissionValue(playerId, cooldownPrefix);
+            if (lpCooldown >= 0) {
+                return lpCooldown;
             }
         }
         

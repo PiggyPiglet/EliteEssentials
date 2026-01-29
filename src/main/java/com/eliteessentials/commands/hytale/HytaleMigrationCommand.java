@@ -5,6 +5,8 @@ import com.eliteessentials.commands.args.SimpleStringArg;
 import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.services.EssentialsCoreMigrationService;
+import com.eliteessentials.services.EssentialsPlusMigrationService;
+import com.eliteessentials.services.HomesPlusMigrationService;
 import com.eliteessentials.services.HyssentialsMigrationService;
 import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.server.core.Message;
@@ -21,6 +23,8 @@ import javax.annotation.Nonnull;
  * Sources:
  * - essentialscore: Migrate from nhulston's EssentialsCore
  * - hyssentials: Migrate from leclowndu93150's Hyssentials
+ * - essentialsplus: Migrate from fof1092's EssentialsPlus
+ * - homesplus: Migrate from HomesPlus
  * 
  * Permissions:
  * - Admin only (simple mode)
@@ -57,8 +61,12 @@ public class HytaleMigrationCommand extends CommandBase {
             handleEssentialsCoreMigration(ctx);
         } else if ("hyssentials".equalsIgnoreCase(source)) {
             handleHyssentialsMigration(ctx);
+        } else if ("essentialsplus".equalsIgnoreCase(source)) {
+            handleEssentialsPlusMigration(ctx);
+        } else if ("homesplus".equalsIgnoreCase(source)) {
+            handleHomesPlusMigration(ctx);
         } else {
-            ctx.sendMessage(Message.raw("Unknown source. Available: essentialscore, hyssentials").color("#FF5555"));
+            ctx.sendMessage(Message.raw("Unknown source. Available: essentialscore, hyssentials, essentialsplus, homesplus").color("#FF5555"));
             ctx.sendMessage(Message.raw("Usage: /eemigration <source>").color("#AAAAAA"));
         }
     }
@@ -153,6 +161,98 @@ public class HytaleMigrationCommand extends CommandBase {
         
         // Remind about existing data
         if (result.getWarpsImported() == 0 && result.getHomesImported() == 0) {
+            ctx.sendMessage(Message.raw("No new data imported. Existing data was preserved.").color("#AAAAAA"));
+        }
+    }
+    
+    private void handleEssentialsPlusMigration(CommandContext ctx) {
+        EliteEssentials plugin = EliteEssentials.getInstance();
+        
+        EssentialsPlusMigrationService migrationService = new EssentialsPlusMigrationService(
+            plugin.getDataFolder(),
+            plugin.getWarpStorage(),
+            plugin.getKitService(),
+            plugin.getPlayerFileStorage()
+        );
+        
+        // Check if source data exists
+        if (!migrationService.hasEssentialsPlusData()) {
+            ctx.sendMessage(Message.raw("EssentialsPlus data not found!").color("#FF5555"));
+            ctx.sendMessage(Message.raw("Expected folder: mods/fof1092_EssentialsPlus/").color("#AAAAAA"));
+            return;
+        }
+        
+        ctx.sendMessage(Message.raw("Starting EssentialsPlus migration...").color("#FFAA00"));
+        ctx.sendMessage(Message.raw("Source: " + migrationService.getEssentialsPlusFolder().getAbsolutePath()).color("#AAAAAA"));
+        
+        // Run migration
+        EssentialsPlusMigrationService.MigrationResult result = migrationService.migrate();
+        
+        // Report results
+        if (result.isSuccess()) {
+            ctx.sendMessage(Message.raw("Migration complete!").color("#55FF55"));
+        } else {
+            ctx.sendMessage(Message.raw("Migration completed with errors.").color("#FFAA00"));
+        }
+        
+        ctx.sendMessage(Message.raw("- Warps imported: " + result.getWarpsImported()).color("#AAAAAA"));
+        ctx.sendMessage(Message.raw("- Kits imported: " + result.getKitsImported()).color("#AAAAAA"));
+        ctx.sendMessage(Message.raw("- Players with homes: " + result.getPlayersImported()).color("#AAAAAA"));
+        ctx.sendMessage(Message.raw("- Total homes imported: " + result.getHomesImported()).color("#AAAAAA"));
+        
+        if (!result.getErrors().isEmpty()) {
+            ctx.sendMessage(Message.raw("Errors (" + result.getErrors().size() + "):").color("#FF5555"));
+            for (String error : result.getErrors()) {
+                ctx.sendMessage(Message.raw("  - " + error).color("#FF7777"));
+            }
+        }
+        
+        // Remind about existing data
+        if (result.getWarpsImported() == 0 && result.getKitsImported() == 0 && result.getHomesImported() == 0) {
+            ctx.sendMessage(Message.raw("No new data imported. Existing data was preserved.").color("#AAAAAA"));
+        }
+    }
+    
+    private void handleHomesPlusMigration(CommandContext ctx) {
+        EliteEssentials plugin = EliteEssentials.getInstance();
+        
+        HomesPlusMigrationService migrationService = new HomesPlusMigrationService(
+            plugin.getDataFolder(),
+            plugin.getPlayerFileStorage()
+        );
+        
+        // Check if source data exists
+        if (!migrationService.hasHomesPlusData()) {
+            ctx.sendMessage(Message.raw("HomesPlus data not found!").color("#FF5555"));
+            ctx.sendMessage(Message.raw("Expected folder: mods/HomesPlus_HomesPlus/").color("#AAAAAA"));
+            return;
+        }
+        
+        ctx.sendMessage(Message.raw("Starting HomesPlus migration...").color("#FFAA00"));
+        ctx.sendMessage(Message.raw("Source: " + migrationService.getHomesPlusFolder().getAbsolutePath()).color("#AAAAAA"));
+        
+        // Run migration
+        HomesPlusMigrationService.MigrationResult result = migrationService.migrate();
+        
+        // Report results
+        if (result.isSuccess()) {
+            ctx.sendMessage(Message.raw("Migration complete!").color("#55FF55"));
+        } else {
+            ctx.sendMessage(Message.raw("Migration completed with errors.").color("#FFAA00"));
+        }
+        
+        ctx.sendMessage(Message.raw("- Players with homes: " + result.getPlayersImported()).color("#AAAAAA"));
+        ctx.sendMessage(Message.raw("- Total homes imported: " + result.getHomesImported()).color("#AAAAAA"));
+        
+        if (!result.getErrors().isEmpty()) {
+            ctx.sendMessage(Message.raw("Errors (" + result.getErrors().size() + "):").color("#FF5555"));
+            for (String error : result.getErrors()) {
+                ctx.sendMessage(Message.raw("  - " + error).color("#FF7777"));
+            }
+        }
+        
+        // Remind about existing data
+        if (result.getHomesImported() == 0) {
             ctx.sendMessage(Message.raw("No new data imported. Existing data was preserved.").color("#AAAAAA"));
         }
     }

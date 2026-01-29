@@ -2,6 +2,119 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.1.5] - 2026-01-29
+
+Special thanks to AfkF24 for making changes to the GUI system and making it look way better.
+
+### Added
+
+**EssentialsPlus Migration** - Migration tool for fof1092's EssentialsPlus plugin data
+* Migrates kits 
+* Migrates homes 
+* Migrates warps
+* Run with `/eemigration essentialsplus`
+* Converts kit cooldowns from milliseconds to seconds
+* Imports items from all inventory sections: hotbar, storage, armor, utility
+* Preserves existing data (skips duplicates)
+
+**HomesPlus Migration** - Migration tool for HomesPlus plugin data
+* Migrates homes from `mods/HomesPlus_HomesPlus/homes.json`
+* Run with `/eemigration homesplus`
+* Preserves existing data (skips duplicates)
+
+**Spawn on Every Login** - Teleport players to spawn every time they log in
+* New config option: `spawn.teleportOnEveryLogin` (default: false)
+* When enabled, ALL players teleport to spawn when they join the server
+* Works with cross-world teleport: log out in world 2, spawn in world 1
+* Respects `perWorld` setting: uses `mainWorld` spawn when `perWorld: false`
+* Useful for hub/lobby servers that want players to always start at spawn
+
+**Back Command Cooldown** - Added cooldown support for `/back` command
+* New config option: `back.cooldownSeconds` (default: 0)
+* Supports permission-based cooldown overrides via LuckPerms
+
+**TPA Selection GUI** - New clickable GUI for managing teleport requests
+* `/tpa` (no args) opens a GUI showing all pending TPA requests
+* View incoming requests from other players wanting to teleport to you
+* View outgoing requests you've sent to other players
+* Click to accept or deny requests directly from the GUI
+* Shows request type (TPA vs TPAHERE) and requester/target name
+
+**Improved Home GUI** - Enhanced home selection interface
+* Redesigned layout with cleaner presentation
+* Edit button to rename or delete homes
+* Shows home coordinates and world name
+* Pagination for players with many homes
+
+**Improved Warp GUI** - Enhanced warp selection interface
+* Cleaner layout matching the new home GUI style
+* Shows warp descriptions when set
+* Admin delete button for warp management
+* Pagination support for servers with many warps
+
+**Improved Kit GUI** - Enhanced kit selection interface
+* Cleaner layout matching the new GUI style
+* Shows kit status (ready, on cooldown, claimed)
+* Displays cooldown time remaining
+* Pagination support for servers with many kits
+
+### Changed
+
+**LuckPerms-Based Custom Values** - Cooldowns and limits now support ANY numeric value via LuckPerms
+* No more predefined "supported values" - use any number you want
+* Custom cooldowns: `eliteessentials.command.tp.cooldown.rtp.1000` (1000 seconds)
+* Custom limits: `eliteessentials.command.home.limit.37` (37 homes)
+* Requires LuckPerms for custom values; without LuckPerms, config defaults are used
+* Applies to: all cooldowns (tp, misc commands) and limits (homes, warps)
+* Lowest cooldown value wins (most favorable to player)
+* Highest limit value wins (most favorable to player)
+
+### Fixed
+
+**Respawn Cross-World Teleport** - Fixed `mainWorld` config not working for respawns
+* When `perWorld: false`, dying in another world without a bed now correctly respawns you in the `mainWorld` spawn
+* Previously players would respawn at the current world's spawn instead of the configured main world
+* Now uses cross-world teleport when target spawn is in a different world
+
+**God Mode Server Crash** - Fixed crash exploit when rapidly toggling `/god` with `/gm` commands
+* Rapid `/god` spam combined with `/gm c` and `/gm a` could crash the server
+* Root cause: `removeComponent()` called without checking if component exists in archetype
+* Creative mode manages `Invulnerable` component independently, causing state desync
+* Added 500ms rate limiting to prevent rapid command spam
+* Command now syncs with actual component state before toggling
+* Safe removal: only removes component if it actually exists
+* Exception handling prevents crash even in edge cases
+
+**External Economy Compatibility** - Full support for Ecotale and other VaultUnlocked economy plugins
+* When `useExternalEconomy: true`, EE no longer registers any economy commands (`/wallet`, `/pay`, `/baltop`, `/eco`) to avoid conflicts
+* Command costs (like `/rtp` cost) now properly use the external economy balance via VaultUnlocked
+* Fixed VaultUnlocked 2.x API calls - all methods now use correct signature with plugin name parameter
+* Fixed `EconomyResponse` handling - now uses `transactionSuccess()` method per VaultUnlocked API
+* Fixed VaultUnlocked detection - tries multiple API methods (`economyObj()`, `getEconomy()`, `economy()`)
+* Added 30-second delayed retry for external economy detection (handles plugin load order issues)
+* Running `/ee reload` will retry external economy detection if it failed at startup
+
+**Duplicate Quit Messages** - Fixed quit message spamming 3-4+ times on disconnect
+* `PlayerDisconnectEvent` can fire multiple times for a single disconnect (network issues)
+* Added deduplication guard using `onlinePlayers.remove()` return value
+* Only the first disconnect event broadcasts the quit message
+
+**Home/Warp Limit Permissions** - Fixed permission-based limits not recognizing all values
+* Previously only checked specific values (1, 2, 3, 5, 10, 15, 20, 25, 50, 100)
+* Now uses LuckPerms to read any numeric value from permissions
+* Permissions like `eliteessentials.command.home.limit.37` now work correctly
+
+**Custom Cooldown Permissions** - Fixed cooldown permissions not recognizing custom values
+* Previously only checked predefined values (30, 60, 120, etc.)
+* Now uses LuckPerms to read any numeric value from permissions
+* Permissions like `eliteessentials.command.misc.repair.cooldown.1000` now work correctly
+
+### Changed
+
+* Updated config comment for `useExternalEconomy` to clarify that `/eco` and `/pay` won't be registered when enabled
+
+---
+
 ## [1.1.4] - 2026-01-27
 
 ### Added
@@ -38,7 +151,7 @@ All notable changes to EliteEssentials will be documented in this file.
 * Each command now has `cooldownSeconds` in config (default: 0 = no cooldown)
 * Permission-based cooldown bypass: `eliteessentials.command.misc.<cmd>.bypass.cooldown`
 * Permission-based cooldown override: `eliteessentials.command.misc.<cmd>.cooldown.<seconds>`
-* Common cooldown values: 30, 60, 120, 180, 300, 600, 900, 1800, 3600 seconds
+* Any numeric value supported via LuckPerms (e.g., `.cooldown.1000` for 1000 seconds)
 * Works in both simple mode (uses config value) and advanced mode (permission overrides)
 * Example: Give VIPs shorter heal cooldown with `eliteessentials.command.misc.heal.cooldown.30`
 

@@ -5,7 +5,9 @@ import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.config.PluginConfig;
 import com.eliteessentials.model.Location;
 import com.eliteessentials.permissions.Permissions;
+import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.services.BackService;
+import com.eliteessentials.services.CooldownService;
 import com.eliteessentials.services.WarmupService;
 import com.eliteessentials.util.CommandPermissionUtil;
 import com.eliteessentials.util.MessageFormatter;
@@ -31,22 +33,23 @@ import java.util.UUID;
  * Teleports the player to their previous location.
  * 
  * Permissions:
- * - eliteessentials.command.back - Use /back command
- * - eliteessentials.command.back.ondeath - Return to death location
- * - eliteessentials.bypass.warmup.back - Skip warmup
- * - eliteessentials.bypass.cooldown.back - Skip cooldown
+ * - eliteessentials.command.tp.back - Use /back command
+ * - eliteessentials.command.tp.back.ondeath - Return to death location
+ * - eliteessentials.command.tp.bypass.warmup.back - Skip warmup
+ * - eliteessentials.command.tp.bypass.cooldown.back - Skip cooldown
+ * - eliteessentials.command.tp.cooldown.back.<seconds> - Custom cooldown
  */
 public class HytaleBackCommand extends AbstractPlayerCommand {
 
     private static final String COMMAND_NAME = "back";
     
     private final BackService backService;
+    private final CooldownService cooldownService;
 
-    public HytaleBackCommand(BackService backService) {
+    public HytaleBackCommand(BackService backService, CooldownService cooldownService) {
         super(COMMAND_NAME, "Return to your previous location");
         this.backService = backService;
-        
-        // Permission check handled in execute() via CommandPermissionUtil
+        this.cooldownService = cooldownService;
     }
 
     @Override
@@ -66,6 +69,19 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
         ConfigManager configManager = EliteEssentials.getInstance().getConfigManager();
         UUID playerId = player.getUuid();
         WarmupService warmupService = EliteEssentials.getInstance().getWarmupService();
+        
+        // Get effective cooldown from permissions
+        int effectiveCooldown = PermissionService.get().getTpCommandCooldown(playerId, COMMAND_NAME, config.back.cooldownSeconds);
+        
+        // Check cooldown if player has one
+        if (effectiveCooldown > 0) {
+            int cooldownRemaining = cooldownService.getCooldownRemaining(COMMAND_NAME, playerId);
+            if (cooldownRemaining > 0) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(
+                    configManager.getMessage("onCooldown", "seconds", String.valueOf(cooldownRemaining)), "#FF5555"));
+                return;
+            }
+        }
         
         // Check if already warming up
         if (warmupService.hasActiveWarmup(playerId)) {
@@ -99,6 +115,9 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
         }
         final World finalWorld = targetWorld;
 
+        // Capture effective cooldown for use in lambda
+        final int finalEffectiveCooldown = effectiveCooldown;
+        
         // Define the teleport action
         Runnable doTeleport = () -> {
             // Now pop the location (consume it)
@@ -114,6 +133,11 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
                 
                 // Charge cost AFTER successful teleport
                 CommandPermissionUtil.chargeCost(ctx, player, "back", config.back.cost);
+                
+                // Set cooldown after successful teleport
+                if (finalEffectiveCooldown > 0) {
+                    cooldownService.setCooldown(COMMAND_NAME, playerId, finalEffectiveCooldown);
+                }
                 
                 ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("backTeleported"), "#55FF55"));
             });

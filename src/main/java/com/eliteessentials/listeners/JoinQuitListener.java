@@ -413,6 +413,77 @@ public class JoinQuitListener {
                         broadcastMessage(message, "#55FF55");
                     }
                 }
+                
+                // Teleport returning players to spawn on every login if enabled
+                if (config.spawn.teleportOnEveryLogin && spawnStorage != null) {
+                    // Determine which world's spawn to use based on perWorld setting
+                    // When perWorld=false, always use mainWorld spawn (cross-world teleport)
+                    // When perWorld=true, use current world's spawn
+                    String targetWorldName = config.spawn.perWorld ? worldName : config.spawn.mainWorld;
+                    SpawnStorage.SpawnData spawn = spawnStorage.getSpawn(targetWorldName);
+                    
+                    if (spawn != null) {
+                        try {
+                            Vector3d spawnPos = new Vector3d(spawn.x, spawn.y, spawn.z);
+                            Vector3f spawnRot = new Vector3f(0, spawn.yaw, 0); // pitch=0, yaw, roll=0
+                            
+                            // Check if spawn is in a different world
+                            if (!targetWorldName.equalsIgnoreCase(worldName)) {
+                                // Cross-world teleport needs a delay to let player fully load first
+                                final String finalTargetWorldName = targetWorldName;
+                                final String finalPlayerName = playerName;
+                                scheduler.schedule(() -> {
+                                    world.execute(() -> {
+                                        try {
+                                            if (!ref.isValid()) {
+                                                logger.warning("[SpawnOnLogin] Player ref no longer valid for cross-world teleport");
+                                                return;
+                                            }
+                                            
+                                            World targetWorld = findWorldByName(finalTargetWorldName);
+                                            if (targetWorld != null) {
+                                                Teleport teleport = new Teleport(targetWorld, spawnPos, spawnRot);
+                                                store.putComponent(ref, Teleport.getComponentType(), teleport);
+                                                
+                                                if (configManager.isDebugEnabled()) {
+                                                    logger.info("[SpawnOnLogin] Teleported " + finalPlayerName + 
+                                                        " to spawn in world '" + finalTargetWorldName + "' at " +
+                                                        String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                                }
+                                            } else {
+                                                logger.warning("[SpawnOnLogin] Target world '" + finalTargetWorldName + 
+                                                    "' not found for player " + finalPlayerName);
+                                            }
+                                        } catch (Exception e) {
+                                            logger.warning("[SpawnOnLogin] Failed cross-world teleport for " + finalPlayerName + ": " + e.getMessage());
+                                        }
+                                    });
+                                }, 1, TimeUnit.SECONDS);
+                                
+                                if (configManager.isDebugEnabled()) {
+                                    logger.info("[SpawnOnLogin] Scheduled cross-world teleport for " + playerName + 
+                                        " to world '" + targetWorldName + "'");
+                                }
+                            } else {
+                                // Same world teleport - can do immediately
+                                Teleport teleport = new Teleport(spawnPos, spawnRot);
+                                store.putComponent(ref, Teleport.getComponentType(), teleport);
+                                
+                                if (configManager.isDebugEnabled()) {
+                                    logger.info("[SpawnOnLogin] Teleported " + playerName + " to spawn at " +
+                                        String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                }
+                            }
+                        } catch (Exception e) {
+                            logger.warning("[SpawnOnLogin] Failed to teleport " + playerName + " to spawn: " + e.getMessage());
+                        }
+                    } else {
+                        if (configManager.isDebugEnabled()) {
+                            logger.info("[SpawnOnLogin] No spawn set for world '" + targetWorldName + 
+                                "', player " + playerName + " spawned at logout location");
+                        }
+                    }
+                }
             }
             
             // Show global MOTD (only on server join, not world changes)
@@ -459,8 +530,15 @@ public class JoinQuitListener {
         UUID playerId = playerRef.getUuid();
         String playerName = playerRef.getUsername();
         
-        // Remove from online tracking
-        onlinePlayers.remove(playerId);
+        // Guard against duplicate disconnect events - only process if player was actually online
+        // This prevents duplicate quit messages when the server fires multiple disconnect events
+        boolean wasOnline = onlinePlayers.remove(playerId);
+        if (!wasOnline) {
+            // Already processed this disconnect, skip
+            return;
+        }
+        
+        // Clean up tracking data
         worldChangingPlayers.remove(playerId);
         // Clear seen world MOTDs when player disconnects
         seenWorldMotds.remove(playerId);

@@ -227,10 +227,8 @@ public class LuckPermsIntegration {
         perms.add(Permissions.HOME_BYPASS_COOLDOWN);
         perms.add(Permissions.HOME_BYPASS_WARMUP);
         perms.add(Permissions.HOME_LIMIT_UNLIMITED);
-        // Common home limits
-        for (int limit : new int[]{1, 2, 3, 5, 10, 15, 20, 25, 50, 100}) {
-            perms.add(Permissions.homeLimit(limit));
-        }
+        // Note: Custom home limit values (eliteessentials.command.home.limit.<number>) 
+        // are dynamically read from LuckPerms - no predefined values needed
         
         // Teleport commands
         perms.add(Permissions.TPA);
@@ -254,6 +252,8 @@ public class LuckPermsIntegration {
         perms.add(Permissions.tpBypassWarmup("back"));
         perms.add(Permissions.tpBypassWarmup("tpa"));
         perms.add(Permissions.tpBypassWarmup("tpahere"));
+        // Note: Custom cooldown values (eliteessentials.command.tp.cooldown.<cmd>.<seconds>) 
+        // are dynamically read from LuckPerms - no predefined values needed
         
         // Warp commands
         perms.add(Permissions.WARP);
@@ -265,10 +265,8 @@ public class LuckPermsIntegration {
         perms.add(Permissions.WARP_BYPASS_COOLDOWN);
         perms.add(Permissions.WARP_BYPASS_WARMUP);
         perms.add(Permissions.WARP_LIMIT_UNLIMITED);
-        // Common warp limits
-        for (int limit : new int[]{1, 2, 3, 5, 10, 15, 20, 25, 50, 100}) {
-            perms.add(Permissions.warpLimit(limit));
-        }
+        // Note: Custom warp limit values (eliteessentials.command.warp.limit.<number>) 
+        // are dynamically read from LuckPerms - no predefined values needed
         
         // Spawn commands
         perms.add(Permissions.SPAWN);
@@ -1065,6 +1063,181 @@ public class LuckPermsIntegration {
             logger.warning("[LuckPerms] Error demoting: " + e.getMessage());
             e.printStackTrace();
             return false;
+        }
+    }
+    
+    // ==================== PERMISSION VALUE EXTRACTION ====================
+    
+    /**
+     * Get a numeric value from a permission node pattern.
+     * Scans user's permissions for nodes matching the prefix and extracts the number.
+     * 
+     * Example: getPermissionValue(uuid, "eliteessentials.command.misc.repair.cooldown.") 
+     * would find "eliteessentials.command.misc.repair.cooldown.1000" and return 1000.
+     * 
+     * @param playerId Player UUID
+     * @param permissionPrefix Permission prefix to search for (e.g., "eliteessentials.command.misc.repair.cooldown.")
+     * @return The numeric value found, or -1 if not found
+     */
+    public static int getPermissionValue(java.util.UUID playerId, String permissionPrefix) {
+        try {
+            Object[] lpObjects = getLuckPermsObjects(playerId);
+            if (lpObjects == null) {
+                return -1;
+            }
+            
+            Object user = lpObjects[2];
+            
+            // Get all nodes from the user (includes inherited permissions)
+            Method getNodesMethod = user.getClass().getMethod("getNodes");
+            Object nodesCollection = getNodesMethod.invoke(user);
+            
+            if (!(nodesCollection instanceof java.util.Collection)) {
+                return -1;
+            }
+            
+            int lowestValue = Integer.MAX_VALUE;
+            boolean found = false;
+            
+            for (Object node : (java.util.Collection<?>) nodesCollection) {
+                // Get the permission key
+                Method getKeyMethod = node.getClass().getMethod("getKey");
+                String key = (String) getKeyMethod.invoke(node);
+                
+                // Check if it matches our prefix
+                if (key.startsWith(permissionPrefix)) {
+                    String valuePart = key.substring(permissionPrefix.length());
+                    try {
+                        int value = Integer.parseInt(valuePart);
+                        // Take the lowest value (most favorable to player)
+                        if (value < lowestValue) {
+                            lowestValue = value;
+                            found = true;
+                        }
+                    } catch (NumberFormatException ignored) {
+                        // Not a number, skip
+                    }
+                }
+            }
+            
+            return found ? lowestValue : -1;
+            
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+    
+    /**
+     * Get a numeric value from a permission node pattern, checking inherited permissions too.
+     * This version resolves all inherited permissions from groups.
+     * 
+     * @param playerId Player UUID
+     * @param permissionPrefix Permission prefix to search for
+     * @return The numeric value found (lowest/most favorable), or -1 if not found
+     */
+    public static int getInheritedPermissionValue(java.util.UUID playerId, String permissionPrefix) {
+        try {
+            Object[] lpObjects = getLuckPermsObjects(playerId);
+            if (lpObjects == null) {
+                return -1;
+            }
+            
+            Object user = lpObjects[2];
+            
+            // Try to get resolved/inherited nodes using CachedData
+            try {
+                Method getCachedDataMethod = user.getClass().getMethod("getCachedData");
+                Object cachedData = getCachedDataMethod.invoke(user);
+                
+                Method getPermissionDataMethod = cachedData.getClass().getMethod("getPermissionData");
+                Object permissionData = getPermissionDataMethod.invoke(cachedData);
+                
+                // Get the permission map
+                Method getPermissionMapMethod = permissionData.getClass().getMethod("getPermissionMap");
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Boolean> permMap = (java.util.Map<String, Boolean>) getPermissionMapMethod.invoke(permissionData);
+                
+                int lowestValue = Integer.MAX_VALUE;
+                boolean found = false;
+                
+                for (java.util.Map.Entry<String, Boolean> entry : permMap.entrySet()) {
+                    if (entry.getValue() && entry.getKey().startsWith(permissionPrefix)) {
+                        String valuePart = entry.getKey().substring(permissionPrefix.length());
+                        try {
+                            int value = Integer.parseInt(valuePart);
+                            if (value < lowestValue) {
+                                lowestValue = value;
+                                found = true;
+                            }
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
+                
+                if (found) {
+                    return lowestValue;
+                }
+            } catch (Exception e) {
+                // Fall through to direct node check
+            }
+            
+            // Fallback to direct node check
+            return getPermissionValue(playerId, permissionPrefix);
+            
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+    
+    /**
+     * Get a meta value for a player.
+     * LuckPerms meta values are set via: /lp user <player> meta set <key> <value>
+     * 
+     * @param playerId Player UUID
+     * @param metaKey Meta key to look up
+     * @return The meta value, or null if not found
+     */
+    public static String getMetaValue(java.util.UUID playerId, String metaKey) {
+        try {
+            Object[] lpObjects = getLuckPermsObjects(playerId);
+            if (lpObjects == null) {
+                return null;
+            }
+            
+            Object user = lpObjects[2];
+            
+            // Get CachedData -> MetaData
+            Method getCachedDataMethod = user.getClass().getMethod("getCachedData");
+            Object cachedData = getCachedDataMethod.invoke(user);
+            
+            Method getMetaDataMethod = cachedData.getClass().getMethod("getMetaData");
+            Object metaData = getMetaDataMethod.invoke(cachedData);
+            
+            // Get meta value
+            Method getMetaValueMethod = metaData.getClass().getMethod("getMetaValue", String.class);
+            return (String) getMetaValueMethod.invoke(metaData, metaKey);
+            
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Get a meta value as an integer.
+     * 
+     * @param playerId Player UUID
+     * @param metaKey Meta key to look up
+     * @param defaultValue Default value if not found or not a number
+     * @return The meta value as int, or defaultValue if not found
+     */
+    public static int getMetaValueInt(java.util.UUID playerId, String metaKey, int defaultValue) {
+        String value = getMetaValue(playerId, metaKey);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
         }
     }
 }

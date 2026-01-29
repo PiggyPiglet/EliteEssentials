@@ -1,6 +1,7 @@
 package com.eliteessentials.listeners;
 
 import com.eliteessentials.EliteEssentials;
+import com.eliteessentials.config.PluginConfig;
 import com.eliteessentials.storage.SpawnStorage;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -13,6 +14,7 @@ import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import org.jetbrains.annotations.NotNull;
@@ -70,6 +72,7 @@ public class RespawnListener extends RefChangeSystem<EntityStore, DeathComponent
                                    @NotNull Store<EntityStore> store, @NotNull CommandBuffer<EntityStore> buffer) {
         
         boolean debugEnabled = EliteEssentials.getInstance().getConfigManager().isDebugEnabled();
+        PluginConfig config = EliteEssentials.getInstance().getConfigManager().getConfig();
         
         if (debugEnabled) {
             logger.info("[Respawn] ========== PLAYER RESPAWNING ==========");
@@ -79,10 +82,26 @@ public class RespawnListener extends RefChangeSystem<EntityStore, DeathComponent
         // Get world info early - needed for both bed check and spawn teleport
         EntityStore entityStore = store.getExternalData();
         World world = entityStore.getWorld();
-        String worldName = world.getName();
+        String currentWorldName = world.getName();
         
-        // Get our spawn location for this world
-        SpawnStorage.SpawnData ourSpawn = spawnStorage.getSpawn(worldName);
+        // Determine which world's spawn to use based on perWorld config
+        String targetWorldName;
+        if (config.spawn.perWorld) {
+            // Per-world mode: use current world's spawn
+            targetWorldName = currentWorldName;
+            if (debugEnabled) {
+                logger.info("[Respawn] perWorld=true, using current world spawn: " + targetWorldName);
+            }
+        } else {
+            // Main world mode: always use mainWorld spawn
+            targetWorldName = config.spawn.mainWorld;
+            if (debugEnabled) {
+                logger.info("[Respawn] perWorld=false, using mainWorld spawn: " + targetWorldName);
+            }
+        }
+        
+        // Get our spawn location for the target world
+        SpawnStorage.SpawnData ourSpawn = spawnStorage.getSpawn(targetWorldName);
         
         // Check if player has a bed spawn set using Player.getRespawnPosition()
         try {
@@ -164,7 +183,7 @@ public class RespawnListener extends RefChangeSystem<EntityStore, DeathComponent
         // Player has no bed spawn - teleport to /setspawn location
         if (ourSpawn == null) {
             if (debugEnabled) {
-                logger.info("[Respawn] No spawn set for world '" + worldName + "', using vanilla respawn");
+                logger.info("[Respawn] No spawn set for world '" + targetWorldName + "', using vanilla respawn");
                 logger.info("[Respawn] ========================================");
             }
             return;
@@ -172,15 +191,62 @@ public class RespawnListener extends RefChangeSystem<EntityStore, DeathComponent
         
         // Teleport player to spawn using CommandBuffer (safe for system context)
         Vector3d spawnPos = new Vector3d(ourSpawn.x, ourSpawn.y, ourSpawn.z);
-        Vector3f spawnRot = new Vector3f(ourSpawn.pitch, ourSpawn.yaw, 0); // pitch, yaw, roll
+        Vector3f spawnRot = new Vector3f(0, ourSpawn.yaw, 0); // pitch=0, yaw, roll=0
         
-        Teleport teleport = new Teleport(spawnPos, spawnRot);
+        // Check if this is a cross-world teleport
+        boolean isCrossWorld = !targetWorldName.equalsIgnoreCase(currentWorldName);
+        
+        Teleport teleport;
+        if (isCrossWorld) {
+            // Cross-world teleport - need to find the target world
+            World targetWorld = findWorldByName(targetWorldName);
+            if (targetWorld != null) {
+                teleport = new Teleport(targetWorld, spawnPos, spawnRot);
+                if (debugEnabled) {
+                    logger.info("[Respawn] Cross-world teleport from '" + currentWorldName + "' to '" + targetWorldName + "'");
+                }
+            } else {
+                // Target world not found, fall back to same-world teleport
+                logger.warning("[Respawn] Target world '" + targetWorldName + "' not found, using vanilla respawn");
+                if (debugEnabled) {
+                    logger.info("[Respawn] ========================================");
+                }
+                return;
+            }
+        } else {
+            // Same world teleport
+            teleport = new Teleport(spawnPos, spawnRot);
+        }
+        
         buffer.putComponent(ref, Teleport.getComponentType(), teleport);
         
         if (debugEnabled) {
-            logger.info("[Respawn] No bed spawn - teleporting to /setspawn at " + 
+            logger.info("[Respawn] No bed spawn - teleporting to /setspawn in world '" + targetWorldName + "' at " + 
                 String.format("%.1f, %.1f, %.1f", ourSpawn.x, ourSpawn.y, ourSpawn.z));
             logger.info("[Respawn] ========================================");
         }
+    }
+    
+    /**
+     * Find a world by name (case-insensitive).
+     * @param worldName The name of the world to find
+     * @return The World object, or null if not found
+     */
+    private World findWorldByName(String worldName) {
+        if (worldName == null) return null;
+        
+        try {
+            Universe universe = Universe.get();
+            if (universe == null) return null;
+            
+            for (World w : universe.getWorlds().values()) {
+                if (w.getName().equalsIgnoreCase(worldName)) {
+                    return w;
+                }
+            }
+        } catch (Exception e) {
+            logger.warning("[Respawn] Error finding world '" + worldName + "': " + e.getMessage());
+        }
+        return null;
     }
 }

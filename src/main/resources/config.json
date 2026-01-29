@@ -52,7 +52,9 @@
     "warmupSeconds": 3,
     "perWorld": false,
     "mainWorld": "default",
-    "cost": 0.0
+    "cost": 0.0,
+    "teleportOnFirstJoin": true,
+    "teleportOnEveryLogin": false
   },
   
   "warps": {

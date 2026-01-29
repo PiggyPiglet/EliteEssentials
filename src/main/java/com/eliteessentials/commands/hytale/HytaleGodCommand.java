@@ -18,7 +18,10 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 /**
  * Command: /god
@@ -32,6 +35,11 @@ import java.util.UUID;
 public class HytaleGodCommand extends AbstractPlayerCommand {
 
     private static final String COMMAND_NAME = "god";
+    private static final Logger logger = Logger.getLogger("EliteEssentials");
+    
+    // Rate limiting: minimum milliseconds between command executions per player
+    private static final long RATE_LIMIT_MS = 500;
+    private final Map<UUID, Long> lastExecutionTime = new ConcurrentHashMap<>();
     
     private final GodService godService;
     private final ConfigManager configManager;
@@ -61,6 +69,16 @@ public class HytaleGodCommand extends AbstractPlayerCommand {
             return;
         }
         
+        // Rate limiting to prevent rapid command spam that can cause component desync
+        long now = System.currentTimeMillis();
+        Long lastExec = lastExecutionTime.get(playerId);
+        if (lastExec != null && (now - lastExec) < RATE_LIMIT_MS) {
+            ctx.sendMessage(MessageFormatter.formatWithFallback(
+                configManager.getMessage("commandTooFast", "Please wait a moment before using this command again."), "#FF5555"));
+            return;
+        }
+        lastExecutionTime.put(playerId, now);
+        
         // Get effective cooldown from permissions
         int effectiveCooldown = PermissionService.get().getCommandCooldown(playerId, COMMAND_NAME, godConfig.cooldownSeconds);
         
@@ -74,17 +92,46 @@ public class HytaleGodCommand extends AbstractPlayerCommand {
             }
         }
 
-        // Toggle god mode state
+        // Check actual component state to stay in sync with game state (e.g., creative mode)
+        boolean hasInvulnerable = false;
+        try {
+            Invulnerable existing = store.getComponent(ref, Invulnerable.getComponentType());
+            hasInvulnerable = (existing != null);
+        } catch (Exception e) {
+            // Component type not in archetype - treat as not having it
+            hasInvulnerable = false;
+        }
+        
+        // Sync GodService state with actual component state before toggling
+        godService.setGodMode(playerId, hasInvulnerable);
+        
+        // Now toggle based on synced state
         boolean nowEnabled = godService.toggleGodMode(playerId);
 
-        if (nowEnabled) {
-            // Enable invulnerability
-            store.putComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE);
-            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godEnabled"), "#55FF55"));
-        } else {
-            // Disable invulnerability
-            store.removeComponent(ref, Invulnerable.getComponentType());
-            ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godDisabled"), "#FFAA00"));
+        try {
+            if (nowEnabled) {
+                // Enable invulnerability - putComponent is safe even if it exists
+                store.putComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE);
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godEnabled"), "#55FF55"));
+            } else {
+                // Disable invulnerability - only remove if it actually exists
+                if (hasInvulnerable) {
+                    store.removeComponent(ref, Invulnerable.getComponentType());
+                }
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godDisabled"), "#FFAA00"));
+            }
+        } catch (IllegalArgumentException e) {
+            // Component not in archetype - can happen with creative mode interactions
+            // Log but don't crash - the state is already toggled in GodService
+            if (configManager.isDebugEnabled()) {
+                logger.info("[God] Component operation failed (likely creative mode interaction): " + e.getMessage());
+            }
+            // Still show the message since the logical state changed
+            if (nowEnabled) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godEnabled"), "#55FF55"));
+            } else {
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("godDisabled"), "#FFAA00"));
+            }
         }
         
         // Set cooldown based on effective cooldown
