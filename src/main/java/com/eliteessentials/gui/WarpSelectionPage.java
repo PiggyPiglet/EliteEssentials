@@ -291,12 +291,19 @@ public class WarpSelectionPage extends InteractiveCustomUIPage<WarpSelectionPage
         final double finalCost = cost;
         final int configCooldown = config.warps.cooldownSeconds;
         
+        // For cross-world teleports, we must execute on the TARGET world's thread
+        final boolean isCrossWorld = !world.getName().equals(finalWorld.getName());
+        
         Runnable doTeleport = () -> {
             backService.pushLocation(playerId, currentLoc);
             
-            world.execute(() -> {
-                Vector3d targetPos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
-                Vector3f targetRot = new Vector3f(0, loc.getYaw(), 0);
+            Vector3d targetPos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
+            Vector3f targetRot = new Vector3f(0, loc.getYaw(), 0);
+            
+            // Execute teleport on the appropriate world thread
+            World executionWorld = isCrossWorld ? finalWorld : world;
+            executionWorld.execute(() -> {
+                if (!ref.isValid()) return;
                 
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);

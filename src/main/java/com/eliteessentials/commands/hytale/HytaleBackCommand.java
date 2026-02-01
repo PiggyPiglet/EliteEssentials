@@ -118,15 +118,22 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
         // Capture effective cooldown for use in lambda
         final int finalEffectiveCooldown = effectiveCooldown;
         
+        // For cross-world teleports, we must execute on the TARGET world's thread
+        final boolean isCrossWorld = !world.getName().equals(finalWorld.getName());
+        
         // Define the teleport action
         Runnable doTeleport = () -> {
             // Now pop the location (consume it)
             backService.popLocation(playerId);
             
-            world.execute(() -> {
-                Vector3d targetPos = new Vector3d(destination.getX(), destination.getY(), destination.getZ());
-                // Always use pitch=0 to keep player upright, preserve yaw for direction
-                Vector3f targetRot = new Vector3f(0, destination.getYaw(), 0);
+            Vector3d targetPos = new Vector3d(destination.getX(), destination.getY(), destination.getZ());
+            // Always use pitch=0 to keep player upright, preserve yaw for direction
+            Vector3f targetRot = new Vector3f(0, destination.getYaw(), 0);
+            
+            // Execute teleport on the appropriate world thread
+            World executionWorld = isCrossWorld ? finalWorld : world;
+            executionWorld.execute(() -> {
+                if (!ref.isValid()) return;
                 
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
@@ -139,7 +146,7 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
                     cooldownService.setCooldown(COMMAND_NAME, playerId, finalEffectiveCooldown);
                 }
                 
-                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("backTeleported"), "#55FF55"));
+                player.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("backTeleported"), "#55FF55"));
             });
         };
 

@@ -2,7 +2,6 @@ package com.eliteessentials.listeners;
 
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.integration.LuckPermsIntegration;
-import com.eliteessentials.integration.PAPIIntegration;
 import com.eliteessentials.permissions.PermissionService;
 import com.eliteessentials.permissions.Permissions;
 import com.eliteessentials.util.MessageFormatter;
@@ -57,6 +56,11 @@ public class ChatListener {
      * Handle player chat event.
      */
     private void onPlayerChat(PlayerChatEvent event) {
+        // Skip if already cancelled by another handler to prevent double processing
+        if (event.isCancelled()) {
+            return;
+        }
+        
         PlayerRef sender = event.getSender();
         if (!sender.isValid()) {
             logger.warning("Chat event received but sender is invalid");
@@ -84,17 +88,12 @@ public class ChatListener {
         // Cancel the event to prevent default/LuckPerms formatting
         event.setCancelled(true);
         
-        // Replace placeholders
+        // Replace placeholders - build the formatted message step by step
         String formattedMessage = format
                 .replace("{player}", playerName)
-                .replace("{displayname}", playerName);
+                .replace("{displayname}", playerName)
+                .replace("{message}", processedMessage);
 
-        if (PAPIIntegration.available() && configManager.getConfig().chatFormat.placeholderapi && formattedMessage.indexOf('%') != -1) {
-            formattedMessage = PAPIIntegration.setPlaceholders(sender, formattedMessage);
-        }
-
-        formattedMessage = format.replace("{message}", processedMessage);
-        
         if (configManager.isDebugEnabled()) {
             logger.info("Formatted message: " + formattedMessage);
         }

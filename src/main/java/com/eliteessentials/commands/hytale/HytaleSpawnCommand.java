@@ -119,13 +119,17 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         Vector3d spawnPos = new Vector3d(spawn.x, spawn.y, spawn.z);
         Vector3f spawnRot = new Vector3f(0, spawn.yaw, 0);
         
+        // For cross-world teleports, we must execute on the TARGET world's thread
+        final boolean isCrossWorld = !world.getName().equals(finalTargetWorld.getName());
+        
         // Define the actual teleport action
         Runnable doTeleport = () -> {
             // Save location for /back
             backService.pushLocation(playerId, currentLoc);
 
-            // Teleport player to spawn (may be cross-world)
-            world.execute(() -> {
+            // Execute teleport on the appropriate world thread
+            World executionWorld = isCrossWorld ? finalTargetWorld : world;
+            executionWorld.execute(() -> {
                 if (!ref.isValid()) return;
                 
                 Teleport teleport = new Teleport(finalTargetWorld, spawnPos, spawnRot);
@@ -134,7 +138,7 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
                 // Charge cost AFTER successful teleport
                 CommandPermissionUtil.chargeCost(ctx, player, "spawn", config.spawn.cost);
                 
-                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnTeleported"), "#55FF55"));
+                player.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("spawnTeleported"), "#55FF55"));
             });
             
             // Set cooldown

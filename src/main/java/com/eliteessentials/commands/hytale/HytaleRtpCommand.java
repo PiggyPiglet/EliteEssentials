@@ -654,14 +654,14 @@ public class HytaleRtpCommand extends CommandBase {
                        String.format("%.1f, %.1f, %.1f", teleportX, teleportY, teleportZ));
         }
         
-        // Find player's current world - we need to execute on THAT thread
+        // Find player's current world to save /back location
         World currentWorld = findPlayerWorld(player);
         if (currentWorld == null) {
             ctx.sendMessage(Message.raw("Could not find player's current world.").color("#FF5555"));
             return;
         }
         
-        // Execute on player's current world thread to access their store/ref
+        // First, gather player data on their current world thread
         currentWorld.execute(() -> {
             // Get player's store and ref directly from PlayerRef
             Ref<EntityStore> ref = player.getReference();
@@ -690,21 +690,25 @@ public class HytaleRtpCommand extends CommandBase {
                 backService.pushLocation(playerId, currentLoc);
             }
             
-            // Teleport to target world
-            Vector3d targetPos = new Vector3d(teleportX, teleportY, teleportZ);
-            Teleport teleport = new Teleport(targetWorld, targetPos, new Vector3f(0, 0, 0));
-            store.putComponent(ref, Teleport.getComponentType(), teleport);
-            
-            String location = String.format("%.0f, %.0f, %.0f", teleportX, teleportY, teleportZ);
-            String worldName = targetWorld.getName();
-            ctx.sendMessage(MessageFormatter.formatWithFallback(
-                configManager.getMessage("rtpTeleportedWorld", "location", location, "world", worldName), "#55FF55"));
-            
-            if (!isAdminRtp) {
-                // Charge cost AFTER successful teleport
-                CommandPermissionUtil.chargeCost(ctx, player, "rtp", rtpConfig.cost);
-                rtpService.setCooldown(playerId);
-            }
+            // For cross-world teleport, execute on the TARGET world's thread
+            targetWorld.execute(() -> {
+                if (!ref.isValid()) return;
+                
+                Vector3d targetPos = new Vector3d(teleportX, teleportY, teleportZ);
+                Teleport teleport = new Teleport(targetWorld, targetPos, new Vector3f(0, 0, 0));
+                store.putComponent(ref, Teleport.getComponentType(), teleport);
+                
+                String location = String.format("%.0f, %.0f, %.0f", teleportX, teleportY, teleportZ);
+                String worldName = targetWorld.getName();
+                player.sendMessage(MessageFormatter.formatWithFallback(
+                    configManager.getMessage("rtpTeleportedWorld", "location", location, "world", worldName), "#55FF55"));
+                
+                if (!isAdminRtp) {
+                    // Charge cost AFTER successful teleport
+                    CommandPermissionUtil.chargeCost(ctx, player, "rtp", rtpConfig.cost);
+                    rtpService.setCooldown(playerId);
+                }
+            });
         });
     }
     
