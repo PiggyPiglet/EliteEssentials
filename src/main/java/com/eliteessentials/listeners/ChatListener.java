@@ -67,13 +67,12 @@ public class ChatListener {
             return;
         }
         
+        // Cancel the event IMMEDIATELY to prevent default/LuckPerms formatting
+        // This must happen before any processing to ensure no other handlers see it
+        event.setCancelled(true);
+        
         String playerName = sender.getUsername();
         String originalMessage = event.getContent();
-        
-        if (configManager.isDebugEnabled()) {
-            logger.info("Processing chat from " + playerName);
-            logger.info("LuckPerms available: " + LuckPermsIntegration.isAvailable());
-        }
         
         // Process player message - strip color/format codes if they don't have permission
         String processedMessage = processPlayerMessage(sender, originalMessage);
@@ -81,31 +80,16 @@ public class ChatListener {
         // Get the chat format for this player's group
         String format = getChatFormat(sender);
         
-        if (configManager.isDebugEnabled()) {
-            logger.info("Selected format for " + playerName + ": " + format);
-        }
-        
-        // Cancel the event to prevent default/LuckPerms formatting
-        event.setCancelled(true);
-        
         // Replace placeholders - build the formatted message step by step
         String formattedMessage = format
                 .replace("{player}", playerName)
                 .replace("{displayname}", playerName)
                 .replace("{message}", processedMessage);
-
-        if (configManager.isDebugEnabled()) {
-            logger.info("Formatted message: " + formattedMessage);
-        }
         
         // Broadcast the formatted message to all players
         Message message = MessageFormatter.format(formattedMessage);
         for (PlayerRef player : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
             player.sendMessage(message);
-        }
-        
-        if (configManager.isDebugEnabled()) {
-            logger.info("Message broadcasted to all players");
         }
     }
     

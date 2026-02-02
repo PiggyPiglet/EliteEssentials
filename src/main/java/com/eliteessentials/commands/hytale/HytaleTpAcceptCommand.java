@@ -172,28 +172,33 @@ public class HytaleTpAcceptCommand extends AbstractPlayerCommand {
         
         // Define teleport action
         Runnable doTeleport = () -> {
-            world.execute(() -> {
-                if (request.getType() == TpaRequest.Type.TPA) {
-                    // Requester teleports to acceptor
+            // ALWAYS execute on the appropriate world's thread to avoid cross-world issues
+            if (request.getType() == TpaRequest.Type.TPA) {
+                // Requester teleports to acceptor
+                backService.pushLocation(request.getRequesterId(), requesterLoc);
+                // Execute on acceptor's world (where requester is going)
+                world.execute(() -> {
                     if (!requesterRef.isValid()) return;
-                    backService.pushLocation(request.getRequesterId(), requesterLoc);
                     Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, targetYaw, 0));
                     requesterStore.putComponent(requesterRef, Teleport.getComponentType(), teleport);
                     // Charge cost AFTER successful teleport
                     CommandPermissionUtil.chargeCost(ctx, requester, "tpa", config.tpa.cost);
                     requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpaAcceptedRequester", "player", player.getUsername()), "#55FF55"));
-                } else {
-                    // Acceptor teleports to requester (TPAHERE)
+                });
+            } else {
+                // Acceptor teleports to requester (TPAHERE)
+                backService.pushLocation(playerId, targetLoc);
+                // Execute on requester's world (where acceptor is going)
+                world.execute(() -> {
                     if (!ref.isValid()) return;
-                    backService.pushLocation(playerId, targetLoc);
                     Teleport teleport = new Teleport(world, requesterPos, new Vector3f(0, reqRot.y, 0));
                     store.putComponent(ref, Teleport.getComponentType(), teleport);
                     // Charge cost AFTER successful teleport (charge the requester who sent tpahere)
                     CommandPermissionUtil.chargeCost(ctx, requester, "tpahere", config.tpa.tpahereCost);
                     ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpahereAcceptedTarget", "player", request.getRequesterName()), "#55FF55"));
                     requester.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("tpahereAcceptedRequester", "player", player.getUsername()), "#55FF55"));
-                }
-            });
+                });
+            }
         };
         
         startWarmupAndTeleport(ctx, player, requester, requesterPos, targetPos, request, configManager, config, 

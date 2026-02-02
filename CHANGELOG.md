@@ -2,6 +2,41 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.1.6] - 2026-02-02
+
+### Changed
+
+**PlayTime Rewards - Universal Command Execution**
+* Reward commands now use `CommandManager` to execute ANY registered server command as console
+* Works with commands from any mod/plugin (EcoTale, custom mods, etc.)
+* No longer limited to few commands.
+* Supports both `{player}` and `%player%` placeholders
+* Commands execute on world thread for thread safety
+
+### Fixed
+
+**Login Spawn Teleport Timing** - Fixed client crashes and timeouts during player login
+* Increased spawn teleport delay from 1 second to 2 seconds to allow Hytale's login sequence to complete
+* Added world validation before executing delayed teleports to prevent conflicts with Hytale's world changes
+* Prevents "Cannot start a fade out while a fade completion callback is pending" client crash
+* Prevents 30-second timeout when adding player to world
+* Fixes issue where players briefly see default spawn before being teleported
+* Applies to both `teleportOnFirstJoin` and `teleportOnEveryLogin` features
+
+**Cross-World Teleportation Stability** - Fully tested and verified all cross-world teleport commands
+* Confirmed working: `/rtp`, `/tpa`, `/tpahere`, `/back`, `/spawn`, `/home`, `/warp`
+* All commands properly handle teleporting between different worlds
+* Thread-safe execution on correct world threads
+* Proper world parameter in Teleport constructor for Hytale's cross-world handling
+
+### Technical
+
+* Spawn teleports now validate player hasn't changed worlds before executing delayed teleport
+* Uses `EntityStore.getWorld()` to check current world (not the deprecated `PlayerRef.getWorld()`)
+* Gracefully cancels teleport if player moved to different world during delay period
+
+---
+
 ## [1.1.5] - 2026-01-29
 
 Special thanks to AfkF24 for making changes to the GUI system and making it look way better.

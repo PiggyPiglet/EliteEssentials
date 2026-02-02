@@ -197,26 +197,23 @@ public class RespawnListener extends RefChangeSystem<EntityStore, DeathComponent
         boolean isCrossWorld = !targetWorldName.equalsIgnoreCase(currentWorldName);
         
         Teleport teleport;
-        if (isCrossWorld) {
-            // Cross-world teleport - need to find the target world
-            World targetWorld = findWorldByName(targetWorldName);
-            if (targetWorld != null) {
-                teleport = new Teleport(targetWorld, spawnPos, spawnRot);
-                if (debugEnabled) {
-                    logger.info("[Respawn] Cross-world teleport from '" + currentWorldName + "' to '" + targetWorldName + "'");
-                }
-            } else {
-                // Target world not found, fall back to same-world teleport
-                logger.warning("[Respawn] Target world '" + targetWorldName + "' not found, using vanilla respawn");
-                if (debugEnabled) {
-                    logger.info("[Respawn] ========================================");
-                }
-                return;
+        // Get the target world (for both same-world and cross-world)
+        World targetWorld = findWorldByName(targetWorldName);
+        if (targetWorld == null) {
+            // Target world not found, fall back to vanilla respawn
+            logger.warning("[Respawn] Target world '" + targetWorldName + "' not found, using vanilla respawn");
+            if (debugEnabled) {
+                logger.info("[Respawn] ========================================");
             }
-        } else {
-            // Same world teleport
-            teleport = new Teleport(spawnPos, spawnRot);
+            return;
         }
+        
+        if (isCrossWorld && debugEnabled) {
+            logger.info("[Respawn] Cross-world teleport from '" + currentWorldName + "' to '" + targetWorldName + "'");
+        }
+        
+        // ALWAYS include world in Teleport constructor (even for same-world)
+        teleport = new Teleport(targetWorld, spawnPos, spawnRot);
         
         buffer.putComponent(ref, Teleport.getComponentType(), teleport);
         

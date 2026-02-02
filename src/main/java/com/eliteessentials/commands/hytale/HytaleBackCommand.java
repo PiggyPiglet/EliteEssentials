@@ -130,12 +130,16 @@ public class HytaleBackCommand extends AbstractPlayerCommand {
             // Always use pitch=0 to keep player upright, preserve yaw for direction
             Vector3f targetRot = new Vector3f(0, destination.getYaw(), 0);
             
-            // Execute teleport on the appropriate world thread
-            World executionWorld = isCrossWorld ? finalWorld : world;
-            executionWorld.execute(() -> {
+            // CRITICAL: For cross-world teleports, execute on the CURRENT world's thread
+            // and use the CURRENT world's store, but include the TARGET world in the Teleport constructor.
+            // This is how Hytale handles cross-world teleportation.
+            world.execute(() -> {
                 if (!ref.isValid()) return;
                 
+                // ALWAYS include world in Teleport constructor (even for same-world)
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
+                
+                // Use the CURRENT world's store (where player is now)
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
                 // Charge cost AFTER successful teleport

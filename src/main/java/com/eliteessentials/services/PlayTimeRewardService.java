@@ -3,16 +3,19 @@ package com.eliteessentials.services;
 import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.config.PluginConfig;
-import com.eliteessentials.integration.LuckPermsIntegration;
 import com.eliteessentials.model.PlayTimeReward;
 import com.eliteessentials.model.PlayerFile;
 import com.eliteessentials.storage.PlayTimeRewardStorage;
 import com.eliteessentials.storage.PlayerFileStorage;
 import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.command.system.CommandManager;
+import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
 
+import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.logging.Logger;
@@ -372,249 +375,102 @@ public class PlayTimeRewardService {
     
     /**
      * Execute a reward command with placeholder replacement.
-     * Note: Hytale doesn't have a direct command dispatch API, so we handle
-     * common commands internally and log others for manual execution.
+     * Uses CommandManager to execute ANY registered server command as console.
+     * This allows rewards to use commands from any mod/plugin on the server.
+     * 
+     * Supported placeholders:
+     * - {player} or %player% - replaced with player's username
      */
     private void executeCommand(String command, String playerName, UUID playerId) {
         try {
-            // Replace placeholders
-            String processedCommand = command.replace("{player}", playerName);
+            // Replace placeholders (support both {player} and %player% formats)
+            String processedCommand = command
+                    .replace("{player}", playerName)
+                    .replace("%player%", playerName)
+                    .trim();
             
             // Remove leading slash if present
             if (processedCommand.startsWith("/")) {
                 processedCommand = processedCommand.substring(1);
             }
             
-            // Parse command and args
-            String[] parts = processedCommand.split(" ", 2);
-            String cmdName = parts[0].toLowerCase();
-            String args = parts.length > 1 ? parts[1].trim() : "";
+            // Remove surrounding quotes if present
+            if (processedCommand.startsWith("\"") && processedCommand.endsWith("\"")) {
+                processedCommand = processedCommand.substring(1, processedCommand.length() - 1);
+            }
             
-            // Handle known commands internally
-            switch (cmdName) {
-                case "eco":
-                    handleEcoCommand(playerId, playerName, args);
-                    break;
-                case "lp":
-                case "luckperms":
-                    handleLuckPermsCommand(playerId, playerName, args);
-                    break;
-                default:
-                    // Unknown command - log for manual execution (only in debug mode)
+            if (processedCommand.isEmpty()) {
+                logger.warning("[PlayTimeReward] Empty command after processing: " + command);
+                return;
+            }
+            
+            // Get player's world for thread-safe execution
+            PlayerRef playerRef = Universe.get().getPlayer(playerId);
+            World world = null;
+            
+            if (playerRef != null && playerRef.isValid()) {
+                world = Universe.get().getWorld(playerRef.getWorldUuid());
+            }
+            
+            if (world == null) {
+                world = Universe.get().getDefaultWorld();
+            }
+            
+            if (world == null) {
+                logger.warning("[PlayTimeReward] Could not find a valid world to execute command for " + playerName);
+                return;
+            }
+            
+            // Execute command on world thread for thread safety
+            final String finalCommand = processedCommand;
+            world.execute(() -> {
+                try {
+                    CommandManager cm = CommandManager.get();
+                    
+                    // Create a console sender with full permissions
+                    CommandSender consoleSender = new CommandSender() {
+                        @Override
+                        public String getDisplayName() {
+                            return "Console";
+                        }
+                        
+                        @Override
+                        public UUID getUuid() {
+                            return new UUID(0, 0);
+                        }
+                        
+                        @Override
+                        public void sendMessage(@Nonnull Message message) {
+                            // Log console output in debug mode
+                            if (configManager.isDebugEnabled()) {
+                                logger.info("[PlayTimeReward-Console] " + message.toString());
+                            }
+                        }
+                        
+                        @Override
+                        public boolean hasPermission(@Nonnull String permission) {
+                            return true; // Console has all permissions
+                        }
+                        
+                        @Override
+                        public boolean hasPermission(@Nonnull String permission, boolean defaultValue) {
+                            return true; // Console has all permissions
+                        }
+                    };
+                    
                     if (configManager.isDebugEnabled()) {
-                        logger.info("[PlayTimeReward] Command for " + playerName + ": /" + processedCommand);
-                        logger.info("[PlayTimeReward] Note: This command type is not handled automatically");
+                        logger.info("[PlayTimeReward] Executing command: " + finalCommand);
                     }
-            }
+                    
+                    cm.handleCommand(consoleSender, finalCommand);
+                    
+                } catch (Exception e) {
+                    logger.warning("[PlayTimeReward] Failed to execute command '" + finalCommand + "': " + e.getMessage());
+                }
+            });
             
-            if (configManager.isDebugEnabled()) {
-                logger.info("Processed reward command: " + processedCommand);
-            }
         } catch (Exception e) {
-            logger.warning("Failed to execute reward command '" + command + "': " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Handle economy commands internally.
-     */
-    private void handleEcoCommand(UUID playerId, String playerName, String args) {
-        // Parse: give/take/set <player> <amount>
-        String[] parts = args.split(" ");
-        if (parts.length < 3) {
-            logger.warning("[PlayTimeReward] Invalid eco command format: eco " + args);
-            return;
-        }
-        
-        String action = parts[0].toLowerCase();
-        String targetName = parts[1];
-        double amount;
-        
-        try {
-            amount = Double.parseDouble(parts[2]);
-        } catch (NumberFormatException e) {
-            logger.warning("[PlayTimeReward] Invalid amount in eco command: " + parts[2]);
-            return;
-        }
-        
-        // Get target player ID
-        UUID targetId = playerId; // Default to reward recipient
-        if (!targetName.equalsIgnoreCase(playerName) && !targetName.equals("{player}")) {
-            // Try to find player by name
-            var targetData = EliteEssentials.getInstance().getPlayerService().getPlayerByName(targetName);
-            if (targetData.isPresent()) {
-                targetId = targetData.get().getUuid();
-            } else {
-                logger.warning("[PlayTimeReward] Player not found for eco command: " + targetName);
-                return;
-            }
-        }
-        
-        PlayerService playerService = EliteEssentials.getInstance().getPlayerService();
-        
-        switch (action) {
-            case "give":
-            case "add":
-                if (playerService.addMoney(targetId, amount)) {
-                    if (configManager.isDebugEnabled()) {
-                        logger.info("[PlayTimeReward] Added " + amount + " to " + targetName);
-                    }
-                }
-                break;
-            case "take":
-            case "remove":
-                if (playerService.removeMoney(targetId, amount)) {
-                    if (configManager.isDebugEnabled()) {
-                        logger.info("[PlayTimeReward] Removed " + amount + " from " + targetName);
-                    }
-                }
-                break;
-            case "set":
-                if (playerService.setBalance(targetId, amount)) {
-                    if (configManager.isDebugEnabled()) {
-                        logger.info("[PlayTimeReward] Set " + targetName + " balance to " + amount);
-                    }
-                }
-                break;
-            default:
-                logger.warning("[PlayTimeReward] Unknown eco action: " + action);
-        }
-    }
-    
-    /**
-     * Handle LuckPerms commands via API.
-     * Supported formats:
-     * - lp user <player> parent set <group>
-     * - lp user <player> parent add <group>
-     * - lp user <player> parent remove <group>
-     * - lp user <player> group set <group>
-     * - lp user <player> group add <group>
-     * - lp user <player> group remove <group>
-     * - lp user <player> permission set <permission> [true/false]
-     * - lp user <player> permission unset <permission>
-     */
-    private void handleLuckPermsCommand(UUID playerId, String playerName, String args) {
-        if (!LuckPermsIntegration.isAvailable()) {
-            logger.warning("[PlayTimeReward] LuckPerms not available, cannot execute: lp " + args);
-            return;
-        }
-        
-        String[] parts = args.split(" ");
-        if (parts.length < 4) {
-            logger.warning("[PlayTimeReward] Invalid LuckPerms command format: lp " + args);
-            return;
-        }
-        
-        // Parse: user <player> <action> <subaction> [value]
-        String subCommand = parts[0].toLowerCase();
-        if (!subCommand.equals("user")) {
-            logger.warning("[PlayTimeReward] Only 'lp user' commands are supported: lp " + args);
-            return;
-        }
-        
-        String targetName = parts[1];
-        String action = parts[2].toLowerCase();
-        String subAction = parts[3].toLowerCase();
-        
-        // Get target player ID
-        UUID targetId = playerId;
-        if (!targetName.equalsIgnoreCase(playerName) && !targetName.equals("{player}")) {
-            var targetData = EliteEssentials.getInstance().getPlayerService().getPlayerByName(targetName);
-            if (targetData.isPresent()) {
-                targetId = targetData.get().getUuid();
-            } else {
-                logger.warning("[PlayTimeReward] Player not found for LP command: " + targetName);
-                return;
-            }
-        }
-        
-        boolean success = false;
-        
-        // Handle parent/group commands
-        if (action.equals("parent") || action.equals("group")) {
-            if (parts.length < 5) {
-                logger.warning("[PlayTimeReward] Missing group name in LP command: lp " + args);
-                return;
-            }
-            String groupName = parts[4];
-            
-            switch (subAction) {
-                case "set":
-                    success = LuckPermsIntegration.setGroup(targetId, groupName);
-                    if (success) {
-                        logger.info("[PlayTimeReward] Set " + targetName + " group to: " + groupName);
-                    }
-                    break;
-                case "add":
-                    success = LuckPermsIntegration.addGroup(targetId, groupName);
-                    if (success) {
-                        logger.info("[PlayTimeReward] Added " + targetName + " to group: " + groupName);
-                    }
-                    break;
-                case "remove":
-                    success = LuckPermsIntegration.removeGroup(targetId, groupName);
-                    if (success) {
-                        logger.info("[PlayTimeReward] Removed " + targetName + " from group: " + groupName);
-                    }
-                    break;
-                default:
-                    logger.warning("[PlayTimeReward] Unknown LP parent/group action: " + subAction);
-            }
-        }
-        // Handle permission commands
-        else if (action.equals("permission")) {
-            if (parts.length < 5) {
-                logger.warning("[PlayTimeReward] Missing permission in LP command: lp " + args);
-                return;
-            }
-            String permission = parts[4];
-            
-            switch (subAction) {
-                case "set":
-                    // Check for optional true/false value
-                    boolean value = true;
-                    if (parts.length >= 6) {
-                        value = !parts[5].equalsIgnoreCase("false");
-                    }
-                    success = LuckPermsIntegration.setPermission(targetId, permission, value);
-                    if (success) {
-                        logger.info("[PlayTimeReward] Set permission " + permission + "=" + value + " for " + targetName);
-                    }
-                    break;
-                case "unset":
-                    success = LuckPermsIntegration.unsetPermission(targetId, permission);
-                    if (success) {
-                        logger.info("[PlayTimeReward] Unset permission " + permission + " for " + targetName);
-                    }
-                    break;
-                default:
-                    logger.warning("[PlayTimeReward] Unknown LP permission action: " + subAction);
-            }
-        }
-        // Handle promote command: lp user <player> promote <track>
-        else if (action.equals("promote")) {
-            // For promote, subAction is actually the track name
-            String trackName = subAction;
-            success = LuckPermsIntegration.promote(targetId, trackName);
-            if (success) {
-                logger.info("[PlayTimeReward] Promoted " + targetName + " on track: " + trackName);
-            }
-        }
-        // Handle demote command: lp user <player> demote <track>
-        else if (action.equals("demote")) {
-            // For demote, subAction is actually the track name
-            String trackName = subAction;
-            success = LuckPermsIntegration.demote(targetId, trackName);
-            if (success) {
-                logger.info("[PlayTimeReward] Demoted " + targetName + " on track: " + trackName);
-            }
-        }
-        else {
-            logger.warning("[PlayTimeReward] Unsupported LP action: " + action + ". Supported: parent, group, permission, promote, demote");
-        }
-        
-        if (!success && configManager.isDebugEnabled()) {
-            logger.warning("[PlayTimeReward] LP command may have failed: lp " + args);
+            logger.warning("Failed to process reward command '" + command + "': " + e.getMessage());
         }
     }
 

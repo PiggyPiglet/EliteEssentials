@@ -57,6 +57,8 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
         super(COMMAND_NAME, "Manage warps (Admin)");
         this.warpService = warpService;
         
+        addAliases("setwarp");
+        
         // Only register subcommands with DIFFERENT parameter counts
         // 1 param: create <name> (default permission)
         addUsageVariant(new WarpSubCommand1Arg(warpService));
@@ -79,10 +81,10 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
             return;
         }
         
-        showHelp(ctx, configManager);
+        showHelpStatic(ctx, configManager, warpService);
     }
     
-    private void showHelp(CommandContext ctx, ConfigManager configManager) {
+    static void showHelpStatic(CommandContext ctx, ConfigManager configManager, WarpService warpService) {
         Map<String, Warp> warps = warpService.getAllWarps();
         
         ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminTitle"), "#55FFFF"));
@@ -154,7 +156,16 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
                 case "create" -> doCreate(ctx, store, ref, player, world, warpName, "all", warpService);
                 case "delete" -> doDelete(ctx, warpName, warpService, configManager);
                 case "info" -> doInfo(ctx, warpName, warpService, configManager);
-                default -> ctx.sendMessage(Message.raw("Unknown subcommand: " + subcommand + ". Use create, delete, or info.").color("#FF5555"));
+                default -> {
+                    ctx.sendMessage(Message.raw("Unknown subcommand: " + subcommand).color("#FF5555"));
+                    ctx.sendMessage(Message.raw("").color("#FFFFFF"));
+                    ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminCommands"), "#FFAA00"));
+                    ctx.sendMessage(Message.raw("  /warpadmin create <name> [all|op]").color("#AAAAAA"));
+                    ctx.sendMessage(Message.raw("  /warpadmin delete <name>").color("#AAAAAA"));
+                    ctx.sendMessage(Message.raw("  /warpadmin info <name>").color("#AAAAAA"));
+                    ctx.sendMessage(Message.raw("  /warpsetperm <name> <all|op>").color("#AAAAAA"));
+                    ctx.sendMessage(Message.raw("  /warpsetdesc <name> <desc>").color("#AAAAAA"));
+                }
             }
         }
     }
@@ -198,7 +209,14 @@ public class HytaleWarpAdminCommand extends AbstractPlayerCommand {
             if ("create".equals(subcommand)) {
                 doCreate(ctx, store, ref, player, world, warpName, perm, warpService);
             } else {
-                ctx.sendMessage(Message.raw("Unknown subcommand with 2 args. Use: /warpadmin create <name> <all|op>").color("#FF5555"));
+                ctx.sendMessage(Message.raw("Unknown subcommand: " + subcommand).color("#FF5555"));
+                ctx.sendMessage(Message.raw("").color("#FFFFFF"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("warpAdminCommands"), "#FFAA00"));
+                ctx.sendMessage(Message.raw("  /warpadmin create <name> [all|op]").color("#AAAAAA"));
+                ctx.sendMessage(Message.raw("  /warpadmin delete <name>").color("#AAAAAA"));
+                ctx.sendMessage(Message.raw("  /warpadmin info <name>").color("#AAAAAA"));
+                ctx.sendMessage(Message.raw("  /warpsetperm <name> <all|op>").color("#AAAAAA"));
+                ctx.sendMessage(Message.raw("  /warpsetdesc <name> <desc>").color("#AAAAAA"));
             }
         }
     }

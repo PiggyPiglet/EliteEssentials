@@ -206,21 +206,26 @@ public class HytaleRtpCommand extends CommandBase {
         World playerCurrentWorld = findPlayerWorld(targetPlayer);
         boolean isCrossWorld = playerCurrentWorld == null || !playerCurrentWorld.getName().equals(targetWorld.getName());
         
-        // Execute RTP on the target world's thread
         final World finalTargetWorld = targetWorld;
         final boolean finalIsAdminRtp = isAdminRtp;
         final boolean finalIsCrossWorld = isCrossWorld;
         final World finalPlayerCurrentWorld = playerCurrentWorld;
         
-        targetWorld.execute(() -> {
-            if (finalIsCrossWorld) {
-                // Cross-world RTP - search for location then teleport from player's current world
-                performCrossWorldRtp(ctx, targetPlayer, playerId, finalTargetWorld, rtpConfig, finalIsAdminRtp);
-            } else {
-                // Same-world RTP
-                executeRtpOnWorld(ctx, targetPlayer, playerId, finalTargetWorld, rtpConfig, finalIsAdminRtp);
+        if (finalIsCrossWorld) {
+            // Cross-world RTP - must start on player's current world thread
+            if (finalPlayerCurrentWorld == null) {
+                ctx.sendMessage(Message.raw("Could not determine player's current world.").color("#FF5555"));
+                return;
             }
-        });
+            finalPlayerCurrentWorld.execute(() -> {
+                performCrossWorldRtp(ctx, targetPlayer, playerId, finalTargetWorld, rtpConfig, finalIsAdminRtp);
+            });
+        } else {
+            // Same-world RTP - execute on the target world's thread
+            finalTargetWorld.execute(() -> {
+                executeRtpOnWorld(ctx, targetPlayer, playerId, finalTargetWorld, rtpConfig, finalIsAdminRtp);
+            });
+        }
     }
     
     /**
@@ -613,7 +618,8 @@ public class HytaleRtpCommand extends CommandBase {
         float currentYaw = headRotation != null ? headRotation.getRotation().y : 0;
         
         Vector3d targetPos = new Vector3d(teleportX, teleportY, teleportZ);
-        Teleport teleport = new Teleport(targetPos, new Vector3f(0, currentYaw, 0));
+        // ALWAYS include world in Teleport constructor (even for same-world)
+        Teleport teleport = new Teleport(world, targetPos, new Vector3f(0, currentYaw, 0));
         store.putComponent(ref, Teleport.getComponentType(), teleport);
         
         if (invulnerabilitySeconds > 0) {
@@ -690,25 +696,24 @@ public class HytaleRtpCommand extends CommandBase {
                 backService.pushLocation(playerId, currentLoc);
             }
             
-            // For cross-world teleport, execute on the TARGET world's thread
-            targetWorld.execute(() -> {
-                if (!ref.isValid()) return;
-                
-                Vector3d targetPos = new Vector3d(teleportX, teleportY, teleportZ);
-                Teleport teleport = new Teleport(targetWorld, targetPos, new Vector3f(0, 0, 0));
-                store.putComponent(ref, Teleport.getComponentType(), teleport);
-                
-                String location = String.format("%.0f, %.0f, %.0f", teleportX, teleportY, teleportZ);
-                String worldName = targetWorld.getName();
-                player.sendMessage(MessageFormatter.formatWithFallback(
-                    configManager.getMessage("rtpTeleportedWorld", "location", location, "world", worldName), "#55FF55"));
-                
-                if (!isAdminRtp) {
-                    // Charge cost AFTER successful teleport
-                    CommandPermissionUtil.chargeCost(ctx, player, "rtp", rtpConfig.cost);
-                    rtpService.setCooldown(playerId);
-                }
-            });
+            // For cross-world teleport, the Teleport component must be added on the CURRENT world's thread
+            // (the store belongs to the current world, not the target world)
+            if (!ref.isValid()) return;
+            
+            Vector3d targetPos = new Vector3d(teleportX, teleportY, teleportZ);
+            Teleport teleport = new Teleport(targetWorld, targetPos, new Vector3f(0, 0, 0));
+            store.putComponent(ref, Teleport.getComponentType(), teleport);
+            
+            String location = String.format("%.0f, %.0f, %.0f", teleportX, teleportY, teleportZ);
+            String worldName = targetWorld.getName();
+            player.sendMessage(MessageFormatter.formatWithFallback(
+                configManager.getMessage("rtpTeleportedWorld", "location", location, "world", worldName), "#55FF55"));
+            
+            if (!isAdminRtp) {
+                // Charge cost AFTER successful teleport
+                CommandPermissionUtil.chargeCost(ctx, player, "rtp", rtpConfig.cost);
+                rtpService.setCooldown(playerId);
+            }
         });
     }
     

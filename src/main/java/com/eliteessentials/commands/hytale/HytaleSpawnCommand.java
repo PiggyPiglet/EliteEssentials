@@ -119,7 +119,8 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
         Vector3d spawnPos = new Vector3d(spawn.x, spawn.y, spawn.z);
         Vector3f spawnRot = new Vector3f(0, spawn.yaw, 0);
         
-        // For cross-world teleports, we must execute on the TARGET world's thread
+        // For cross-world teleports, we must execute on the CURRENT world's thread
+        // and use the CURRENT world's store, but include the TARGET world in the Teleport constructor.
         final boolean isCrossWorld = !world.getName().equals(finalTargetWorld.getName());
         
         // Define the actual teleport action
@@ -127,12 +128,14 @@ public class HytaleSpawnCommand extends AbstractPlayerCommand {
             // Save location for /back
             backService.pushLocation(playerId, currentLoc);
 
-            // Execute teleport on the appropriate world thread
-            World executionWorld = isCrossWorld ? finalTargetWorld : world;
-            executionWorld.execute(() -> {
+            // Execute on the CURRENT world's thread (where player is now)
+            world.execute(() -> {
                 if (!ref.isValid()) return;
                 
+                // ALWAYS include world in Teleport constructor (even for same-world)
                 Teleport teleport = new Teleport(finalTargetWorld, spawnPos, spawnRot);
+                
+                // Use the CURRENT world's store (where player is now)
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
                 // Charge cost AFTER successful teleport

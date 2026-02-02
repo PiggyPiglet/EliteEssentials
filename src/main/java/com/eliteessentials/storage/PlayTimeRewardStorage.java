@@ -125,15 +125,17 @@ public class PlayTimeRewardStorage {
     
     /**
      * Create default reward examples.
+     * Commands can be ANY registered server command - they run as console with full permissions.
+     * Use {player} or %player% as placeholder for the player's username.
      */
     private void createDefaultRewards() {
         rewards = new ArrayList<>();
         
-        // Example repeatable reward - every hour
+        // Example repeatable reward - every hour (works with any economy mod)
         PlayTimeReward hourly = new PlayTimeReward("hourly_bonus", "Hourly Bonus", 60, true);
         hourly.setMessage("&a[Reward] &fYou received your hourly playtime bonus!");
         hourly.setCommands(Arrays.asList(
-            "eco add {player} 100"
+            "eco give {player} 100"
         ));
         hourly.setEnabled(false); // Disabled by default
         rewards.add(hourly);
@@ -142,29 +144,33 @@ public class PlayTimeRewardStorage {
         PlayTimeReward tenHours = new PlayTimeReward("10h_milestone", "10 Hour Milestone", 600, false);
         tenHours.setMessage("&6[Milestone] &fCongratulations! You've played for 10 hours!");
         tenHours.setCommands(Arrays.asList(
-            "eco add {player} 500"
+            "eco give {player} 500",
+            "give {player} hytale:diamond 5"
         ));
         tenHours.setEnabled(false);
         rewards.add(tenHours);
         
-        // Example milestone - 100 hours (VIP) using group set
+        // Example milestone - 100 hours (VIP) using LuckPerms
         PlayTimeReward hundredHours = new PlayTimeReward("100h_vip", "100 Hour VIP", 6000, false);
         hundredHours.setMessage("&d[Milestone] &fAmazing! 100 hours played! You've earned VIP status!");
         hundredHours.setCommands(Arrays.asList(
-            "lp user {player} group set vip",
-            "eco add {player} 5000"
+            "lp user {player} parent set vip",
+            "eco give {player} 5000"
         ));
         hundredHours.setEnabled(false);
         rewards.add(hundredHours);
         
-        // Example milestone - using track promotion
-        PlayTimeReward trackPromo = new PlayTimeReward("rank_up", "Rank Promotion", 1440, false);
-        trackPromo.setMessage("&b[Rank Up] &fYou've been promoted on the ranks track!");
-        trackPromo.setCommands(Arrays.asList(
-            "lp user {player} promote ranks"
+        // Example: Using commands from other mods (EcoTale, custom mods, etc.)
+        // Any command registered on the server will work!
+        PlayTimeReward customExample = new PlayTimeReward("custom_example", "Custom Mod Example", 120, true);
+        customExample.setMessage("&b[Reward] &fYou received a special bonus!");
+        customExample.setCommands(Arrays.asList(
+            "eco give {player} 200",
+            "blessing give {player} speed 300",
+            "custommod reward {player} tier1"
         ));
-        trackPromo.setEnabled(false);
-        rewards.add(trackPromo);
+        customExample.setEnabled(false);
+        rewards.add(customExample);
         
         saveRewards();
         logger.info("Created default playtime_rewards.json with example rewards (disabled by default)");

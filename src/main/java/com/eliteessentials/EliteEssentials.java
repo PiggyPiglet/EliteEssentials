@@ -207,7 +207,13 @@ public class EliteEssentials extends JavaPlugin {
         playTimeRewardService.setPlayerFileStorage(playerFileStorage);
         
         // Initialize VaultUnlocked integration (optional - for cross-plugin economy support)
-        vaultUnlockedIntegration = new VaultUnlockedIntegration(configManager, playerService);
+        try {
+            vaultUnlockedIntegration = new VaultUnlockedIntegration(configManager, playerService);
+        } catch (NoClassDefFoundError e) {
+            // VaultUnlocked not installed - this is fine, integration is optional
+            getLogger().at(Level.INFO).log("VaultUnlocked not found - economy integration disabled");
+            vaultUnlockedIntegration = null;
+        }
         
         getLogger().at(Level.INFO).log("EliteEssentials setup complete.");
     }
@@ -316,7 +322,7 @@ public class EliteEssentials extends JavaPlugin {
         }
         
         // Initialize VaultUnlocked integration (economy cross-plugin support)
-        if (configManager.getConfig().economy.enabled) {
+        if (configManager.getConfig().economy.enabled && vaultUnlockedIntegration != null) {
             vaultUnlockedIntegration.initialize();
         }
         
@@ -445,7 +451,7 @@ public class EliteEssentials extends JavaPlugin {
                 getCommandRegistry().registerCommand(new HytaleWarpAdminCommand(warpService));
                 getCommandRegistry().registerCommand(new HytaleWarpSetPermCommand(warpService));
                 getCommandRegistry().registerCommand(new HytaleWarpSetDescCommand(warpService));
-                registeredCommands.append("/warp, /warpadmin, /warpsetperm, /warpsetdesc, ");
+                registeredCommands.append("/warp, /warpadmin, /setwarp, /warpsetperm, /warpsetdesc, ");
             } catch (Exception e) {
                 getLogger().at(Level.SEVERE).log("Failed to register warp commands: " + e.getMessage());
             }
@@ -721,6 +727,11 @@ public class EliteEssentials extends JavaPlugin {
         
         // Reload main config
         configManager.loadConfig();
+        
+        // Update packet filters for all online players (for suppressDefaultMessages setting)
+        if (joinQuitListener != null) {
+            joinQuitListener.updatePacketFiltersForAll();
+        }
         
         // Reload storage files (allows external edits to be picked up)
         motdStorage.load();

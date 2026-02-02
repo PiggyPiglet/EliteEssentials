@@ -144,6 +144,12 @@ public class JoinQuitListener {
         eventRegistry.registerGlobal(AddPlayerToWorldEvent.class, event -> {
             onPlayerAddToWorld(event);
         });
+        
+        // Register packet filter to suppress default leave messages
+        // This prevents the "player has left world" message from being sent to clients
+        if (config.joinMsg.suppressDefaultMessages) {
+            LeaveMessagePacketFilter.register();
+        }
     }
     
     /**
@@ -274,12 +280,6 @@ public class JoinQuitListener {
                 return;
             }
             
-            // Override default Hytale join/leave translations with our custom messages
-            // This replaces the built-in "player has joined/left world" with our configured messages
-            if (config.joinMsg.suppressDefaultMessages) {
-                sendTranslationOverrides(playerRef);
-            }
-            
             // Track as online - this is a real server join
             onlinePlayers.add(playerId);
             // Clear any world change flag
@@ -381,17 +381,50 @@ public class JoinQuitListener {
                                             logger.warning("[FirstJoin] Failed cross-world teleport for " + finalPlayerName + ": " + e.getMessage());
                                         }
                                     });
-                                }, 1, TimeUnit.SECONDS);
+                                }, 2, TimeUnit.SECONDS);
                                 
                                 logger.info("[FirstJoin] Scheduled cross-world teleport for " + playerName + 
-                                    " to world '" + targetWorldName + "' in 1 second");
+                                    " to world '" + targetWorldName + "' in 2 seconds");
                             } else {
-                                // Same world teleport - can do immediately
-                                Teleport teleport = new Teleport(spawnPos, spawnRot);
-                                store.putComponent(ref, Teleport.getComponentType(), teleport);
+                                // Same world teleport - still needs delay to let player fully load
+                                final String finalPlayerName = playerName;
+                                final String expectedWorldName = worldName;
+                                scheduler.schedule(() -> {
+                                    world.execute(() -> {
+                                        try {
+                                            if (!ref.isValid()) {
+                                                if (configManager.isDebugEnabled()) {
+                                                    logger.info("[FirstJoin] Player ref no longer valid for spawn teleport (player may have changed worlds)");
+                                                }
+                                                return;
+                                            }
+                                            
+                                            // Verify player is still in the expected world
+                                            EntityStore currentEntityStore = store.getExternalData();
+                                            if (currentEntityStore != null) {
+                                                World currentWorld = currentEntityStore.getWorld();
+                                                if (currentWorld != null && !currentWorld.getName().equalsIgnoreCase(expectedWorldName)) {
+                                                    if (configManager.isDebugEnabled()) {
+                                                        logger.info("[FirstJoin] Player " + finalPlayerName + " changed worlds before teleport (now in '" + 
+                                                            currentWorld.getName() + "'), skipping spawn teleport");
+                                                    }
+                                                    return;
+                                                }
+                                            }
+                                            
+                                            // ALWAYS include world in Teleport constructor (even for same-world)
+                                            Teleport teleport = new Teleport(world, spawnPos, spawnRot);
+                                            store.putComponent(ref, Teleport.getComponentType(), teleport);
+                                            
+                                            logger.info("[FirstJoin] Teleported new player " + finalPlayerName + " to spawn at " +
+                                                String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                        } catch (Exception e) {
+                                            logger.warning("[FirstJoin] Failed to teleport " + finalPlayerName + " to spawn: " + e.getMessage());
+                                        }
+                                    });
+                                }, 2, TimeUnit.SECONDS);
                                 
-                                logger.info("[FirstJoin] Teleported new player " + playerName + " to spawn at " +
-                                    String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                logger.info("[FirstJoin] Scheduled same-world spawn teleport for " + playerName + " in 2 seconds");
                             }
                         } catch (Exception e) {
                             logger.warning("[FirstJoin] Failed to teleport " + playerName + " to spawn: " + e.getMessage());
@@ -458,20 +491,55 @@ public class JoinQuitListener {
                                             logger.warning("[SpawnOnLogin] Failed cross-world teleport for " + finalPlayerName + ": " + e.getMessage());
                                         }
                                     });
-                                }, 1, TimeUnit.SECONDS);
+                                }, 2, TimeUnit.SECONDS);
                                 
                                 if (configManager.isDebugEnabled()) {
                                     logger.info("[SpawnOnLogin] Scheduled cross-world teleport for " + playerName + 
-                                        " to world '" + targetWorldName + "'");
+                                        " to world '" + targetWorldName + "' in 2 seconds");
                                 }
                             } else {
-                                // Same world teleport - can do immediately
-                                Teleport teleport = new Teleport(spawnPos, spawnRot);
-                                store.putComponent(ref, Teleport.getComponentType(), teleport);
+                                // Same world teleport - still needs delay to let player fully load
+                                final String finalPlayerName = playerName;
+                                final String expectedWorldName = worldName;
+                                scheduler.schedule(() -> {
+                                    world.execute(() -> {
+                                        try {
+                                            if (!ref.isValid()) {
+                                                if (configManager.isDebugEnabled()) {
+                                                    logger.info("[SpawnOnLogin] Player ref no longer valid for spawn teleport (player may have changed worlds)");
+                                                }
+                                                return;
+                                            }
+                                            
+                                            // Verify player is still in the expected world
+                                            EntityStore currentEntityStore = store.getExternalData();
+                                            if (currentEntityStore != null) {
+                                                World currentWorld = currentEntityStore.getWorld();
+                                                if (currentWorld != null && !currentWorld.getName().equalsIgnoreCase(expectedWorldName)) {
+                                                    if (configManager.isDebugEnabled()) {
+                                                        logger.info("[SpawnOnLogin] Player " + finalPlayerName + " changed worlds before teleport (now in '" + 
+                                                            currentWorld.getName() + "'), skipping spawn teleport");
+                                                    }
+                                                    return;
+                                                }
+                                            }
+                                            
+                                            // ALWAYS include world in Teleport constructor (even for same-world)
+                                            Teleport teleport = new Teleport(world, spawnPos, spawnRot);
+                                            store.putComponent(ref, Teleport.getComponentType(), teleport);
+                                            
+                                            if (configManager.isDebugEnabled()) {
+                                                logger.info("[SpawnOnLogin] Teleported " + finalPlayerName + " to spawn at " +
+                                                    String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                            }
+                                        } catch (Exception e) {
+                                            logger.warning("[SpawnOnLogin] Failed to teleport " + finalPlayerName + " to spawn: " + e.getMessage());
+                                        }
+                                    });
+                                }, 2, TimeUnit.SECONDS);
                                 
                                 if (configManager.isDebugEnabled()) {
-                                    logger.info("[SpawnOnLogin] Teleported " + playerName + " to spawn at " +
-                                        String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                    logger.info("[SpawnOnLogin] Scheduled same-world spawn teleport for " + playerName + " in 2 seconds");
                                 }
                             }
                         } catch (Exception e) {
@@ -696,56 +764,22 @@ public class JoinQuitListener {
     }
     
     /**
-     * Send translation overrides to a player to blank out default Hytale join/leave messages.
-     * This uses the UpdateTranslations packet to override the client's translation strings
-     * with empty strings, effectively hiding the built-in messages.
-     * 
-     * Our custom join/quit messages are sent separately via broadcastMessage() which
-     * supports color codes and formatting.
-     * 
-     * Note: This results in a blank line in chat, but allows us to use colored messages.
+     * Update packet filters for all online players.
+     * Called on reload to apply new suppressDefaultMessages setting.
      */
-    private void sendTranslationOverrides(PlayerRef playerRef) {
-        if (playerRef == null) return;
-        
-        try {
-            Map<String, String> overrides = new HashMap<>();
-            
-            // Blank out the default messages - we send our own colored messages separately
-            overrides.put(TRANSLATION_KEY_JOINED_WORLD, "");
-            overrides.put(TRANSLATION_KEY_LEFT_WORLD, "");
-            
-            UpdateTranslations packet = new UpdateTranslations(UpdateType.AddOrUpdate, overrides);
-            playerRef.getPacketHandler().write(packet);
-            
-            if (configManager.isDebugEnabled()) {
-                logger.info("Sent translation overrides to " + playerRef.getUsername() 
-                        + " - blanked join/leave messages");
-            }
-        } catch (Exception e) {
-            logger.warning("Failed to send translation overrides: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Send translation overrides to all online players.
-     * Called on reload to update all players with new message formats.
-     */
-    public void sendTranslationOverridesToAll() {
+    public void updatePacketFiltersForAll() {
         PluginConfig config = configManager.getConfig();
-        if (!config.joinMsg.suppressDefaultMessages) {
-            return;
-        }
         
         try {
-            Universe universe = Universe.get();
-            if (universe != null) {
-                for (PlayerRef player : universe.getPlayers()) {
-                    sendTranslationOverrides(player);
-                }
+            if (config.joinMsg.suppressDefaultMessages) {
+                // Register the global filter
+                LeaveMessagePacketFilter.register();
+            } else {
+                // Deregister the filter if it was previously registered
+                LeaveMessagePacketFilter.deregister();
             }
         } catch (Exception e) {
-            logger.warning("Failed to send translation overrides to all players: " + e.getMessage());
+            logger.warning("Failed to update packet filters: " + e.getMessage());
         }
     }
     

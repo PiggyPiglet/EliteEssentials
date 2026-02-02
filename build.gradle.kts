@@ -5,7 +5,7 @@ plugins {
 }
 
 group = findProperty("pluginGroup") as String? ?: "com.eliteessentials"
-version = findProperty("pluginVersion") as String? ?: "1.1.5"
+version = findProperty("pluginVersion") as String? ?: "1.1.6"
 description = findProperty("pluginDescription") as String? ?: "Essential commands for Hytale servers"
 
 repositories {
@@ -13,19 +13,17 @@ repositories {
     mavenCentral()
     
     // VaultUnlocked API repository
-    // Note: VaultUnlocked 2.18.3 for Hytale requires JVM 25+ at runtime
-    // We use reflection-based integration to allow building with JVM 21
-    // maven("https://repo.codemc.io/repository/creatorfromhell/") {
-    //     name = "VaultUnlocked"
-    // }
+    maven("https://repo.codemc.io/repository/creatorfromhell/") {
+        name = "VaultUnlocked"
+    }
 }
 
 dependencies {
     // Hytale Server API (provided by server at runtime)
     compileOnly(files("hytaleserver.jar"))
     
-    // VaultUnlocked - integration is reflection-based to allow building with JVM 21
-    // while running on JVM 25+ servers. No compile-time dependency needed.
+    // VaultUnlocked - compileOnly since it's provided by server at runtime
+    compileOnly("net.cfh.vault:VaultUnlocked:2.18.3")
     
     // JSON handling
     implementation("com.google.code.gson:gson:2.10.1")
@@ -45,7 +43,7 @@ runHytale {
 tasks {
     compileJava {
         options.encoding = Charsets.UTF_8.name()
-        options.release = 21
+        options.release = 25
     }
     
     processResources {
@@ -83,6 +81,7 @@ tasks {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        val javaVersion = findProperty("java_version")?.toString()?.toInt() ?: 25
+        languageVersion.set(JavaLanguageVersion.of(javaVersion))
     }
 }

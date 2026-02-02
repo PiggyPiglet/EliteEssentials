@@ -258,7 +258,8 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
         final double finalCost = cost;
         final boolean finalSilent = silent;
         
-        // For cross-world teleports, we must execute on the TARGET world's thread
+        // For cross-world teleports, we must execute on the CURRENT world's thread
+        // and use the CURRENT world's store, but include the TARGET world in the Teleport constructor.
         final boolean isCrossWorld = !world.getName().equals(finalWorld.getName());
         
         Runnable doTeleport = () -> {
@@ -267,12 +268,14 @@ public class HytaleWarpCommand extends AbstractPlayerCommand {
             Vector3d targetPos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
             Vector3f targetRot = new Vector3f(0, loc.getYaw(), 0);
             
-            // Execute teleport on the appropriate world thread
-            World executionWorld = isCrossWorld ? finalWorld : world;
-            executionWorld.execute(() -> {
+            // Execute on the CURRENT world's thread (where player is now)
+            world.execute(() -> {
                 if (!ref.isValid()) return;
                 
+                // ALWAYS include world in Teleport constructor (even for same-world)
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
+                
+                // Use the CURRENT world's store (where player is now)
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
                 if (finalCostService != null) {

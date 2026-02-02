@@ -221,12 +221,13 @@ public class HomeSelectionPage extends InteractiveCustomUIPage<HomeSelectionPage
             Vector3d targetPos = new Vector3d(loc.getX(), loc.getY(), loc.getZ());
             Vector3f targetRot = new Vector3f(0, loc.getYaw(), 0);
             
-            // Execute teleport on the appropriate world thread
-            World executionWorld = isCrossWorld ? finalWorld : world;
-            executionWorld.execute(() -> {
+            // Execute on the CURRENT world's thread (where player is now)
+            world.execute(() -> {
                 if (!ref.isValid()) return;
                 
+                // ALWAYS include world in Teleport constructor (even for same-world)
                 Teleport teleport = new Teleport(finalWorld, targetPos, targetRot);
+                
                 store.putComponent(ref, Teleport.getComponentType(), teleport);
                 
                 // Charge cost after successful teleport

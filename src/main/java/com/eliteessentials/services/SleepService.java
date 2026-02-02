@@ -160,7 +160,8 @@ public class SleepService {
                     triggerSlumber(store, world, worldSomnolence, players, sleepingPlayers, playersNeeded);
                     slumberTriggered = true;
                     lastSleepingCount = sleepingPlayers;
-                } else if (sleepingPlayers != lastSleepingCount) {
+                } else if (sleepingPlayers != lastSleepingCount && !slumberTriggered && sleepingPlayers > 0) {
+                    // Only send message if count changed, slumber not triggered, and someone is sleeping
                     lastSleepingCount = sleepingPlayers;
                     sendSleepMessage(players, sleepingPlayers, playersNeeded);
                 }
