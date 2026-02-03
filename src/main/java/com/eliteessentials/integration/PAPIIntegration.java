@@ -1,5 +1,6 @@
 package com.eliteessentials.integration;
 
+import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.integration.papi.PlaceholderAPI;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import org.jetbrains.annotations.NotNull;
@@ -17,14 +18,14 @@ public final class PAPIIntegration {
         throw new AssertionError("This class cannot be instantiated.");
     }
 
-    public static void register() {
+    public static void register(@NotNull final EliteEssentials main) {
         try {
             final Class<?> papiClass = Class.forName("at.helpch.placeholderapi.PlaceholderAPI");
             placeholderapi = ((Class<PlaceholderAPI>) Class.forName("com.eliteessentials.integration.papi.PAPIImplementation")).getConstructor().newInstance();
             available = true;
 
             final Class<?> expansionClass = Class.forName("com.eliteessentials.integration.papi.EliteEssentialsExpansion");
-            final Object expansion = expansionClass.getConstructor().newInstance();
+            final Object expansion = expansionClass.getConstructor(EliteEssentials.class).newInstance(main);
             final Method register = expansionClass.getMethod("register");
             register.invoke(expansion);
             LOGGER.info("[PlaceholderAPI] Found, placeholders will be replaced in chat.");

@@ -99,7 +99,7 @@ public class ChatListener {
         
         // Broadcast the formatted message to all players
         for (PlayerRef player : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
-            String replacedMessage = PAPIIntegration.setRelationalPlaceholders(sender, player, format.replace("{message}", processedMessage));
+            String replacedMessage = PAPIIntegration.setRelationalPlaceholders(sender, player, formattedMessage.replace("{message}", processedMessage));
             Message message = MessageFormatter.format(replacedMessage);
             player.sendMessage(message);
         }
