@@ -3,6 +3,7 @@ package com.eliteessentials.listeners;
 import com.eliteessentials.EliteEssentials;
 import com.eliteessentials.config.ConfigManager;
 import com.eliteessentials.config.PluginConfig;
+import com.eliteessentials.integration.PAPIIntegration;
 import com.eliteessentials.services.MailService;
 import com.eliteessentials.services.PlayerService;
 import com.eliteessentials.services.PlayTimeRewardService;
@@ -11,13 +12,11 @@ import com.eliteessentials.storage.PlayerFileStorage;
 import com.eliteessentials.storage.SpawnStorage;
 import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Holder;
-import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.event.EventRegistry;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.protocol.UpdateType;
 import com.hypixel.hytale.protocol.packets.assets.UpdateTranslations;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
@@ -27,6 +26,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.List;
@@ -52,14 +52,14 @@ import java.util.logging.Logger;
  * - Player cache updates (via PlayerService)
  */
 public class JoinQuitListener {
-    
+
     private static final Logger logger = Logger.getLogger("EliteEssentials");
-    
+
     // Translation keys for default Hytale join/leave messages
     // By overriding these, we can replace the default messages with our own
     private static final String TRANSLATION_KEY_JOINED_WORLD = "server.general.playerJoinedWorld";
     private static final String TRANSLATION_KEY_LEFT_WORLD = "server.general.playerLeftWorld";
-    
+
     private final ConfigManager configManager;
     private final MotdStorage motdStorage;
     private final PlayerService playerService;
@@ -68,7 +68,7 @@ public class JoinQuitListener {
     private SpawnStorage spawnStorage;
     private com.eliteessentials.services.VanishService vanishService;
     private MailService mailService;
-    
+
     // Track players currently on the server to differentiate world changes from joins/quits
     private final Set<UUID> onlinePlayers = ConcurrentHashMap.newKeySet();
     // Track players who are changing worlds (drain then add in quick succession)
@@ -77,7 +77,7 @@ public class JoinQuitListener {
     private final ConcurrentHashMap<UUID, Set<String>> seenWorldMotds = new ConcurrentHashMap<>();
     // Track the last world each player was in (to detect world changes when DrainEvent doesn't fire)
     private final ConcurrentHashMap<UUID, String> playerLastWorld = new ConcurrentHashMap<>();
-    
+
     public JoinQuitListener(ConfigManager configManager, MotdStorage motdStorage, PlayerService playerService) {
         this.configManager = configManager;
         this.motdStorage = motdStorage;
@@ -88,56 +88,56 @@ public class JoinQuitListener {
             return t;
         });
     }
-    
+
     /**
      * Set the player file storage (called after initialization).
      */
     public void setPlayerFileStorage(PlayerFileStorage storage) {
         this.playerFileStorage = storage;
     }
-    
+
     /**
      * Set the spawn storage (called after initialization).
      */
     public void setSpawnStorage(SpawnStorage storage) {
         this.spawnStorage = storage;
     }
-    
+
     /**
      * Set the vanish service (called after initialization).
      */
     public void setVanishService(com.eliteessentials.services.VanishService service) {
         this.vanishService = service;
     }
-    
+
     /**
      * Set the mail service (called after initialization).
      */
     public void setMailService(MailService service) {
         this.mailService = service;
     }
-    
+
     /**
      * Register event listeners.
      */
     public void registerEvents(EventRegistry eventRegistry) {
         PluginConfig config = configManager.getConfig();
-        
+
         // Use PlayerReadyEvent for initial server join - fires when player is fully loaded
         eventRegistry.registerGlobal(PlayerReadyEvent.class, event -> {
             onPlayerJoin(event);
         });
-        
+
         // Register quit event for player cache and quit messages
         eventRegistry.registerGlobal(PlayerDisconnectEvent.class, event -> {
             onPlayerQuit(event);
         });
-        
+
         // Handle world changes - DrainPlayerFromWorldEvent fires when leaving a world
         eventRegistry.registerGlobal(DrainPlayerFromWorldEvent.class, event -> {
             onPlayerDrainFromWorld(event);
         });
-        
+
         // Suppress default join messages and handle world change joins
         // Uses AddPlayerToWorldEvent.setBroadcastJoinMessage(false) to prevent
         // the built-in "player has joined default" message
@@ -145,7 +145,7 @@ public class JoinQuitListener {
             onPlayerAddToWorld(event);
         });
     }
-    
+
     /**
      * Handle player being drained from a world (leaving world).
      * This fires for both world changes AND disconnects.
@@ -157,60 +157,60 @@ public class JoinQuitListener {
         if (holder == null) {
             return;
         }
-        
+
         PlayerRef playerRef = holder.getComponent(PlayerRef.getComponentType());
         if (playerRef == null) {
             return;
         }
-        
+
         UUID playerId = playerRef.getUuid();
         String playerName = playerRef.getUsername();
         String worldName = event.getWorld() != null ? event.getWorld().getName() : "unknown";
-        
+
         // Mark as potentially changing worlds
         worldChangingPlayers.add(playerId);
-        
+
         // Broadcast world leave message if enabled
         PluginConfig config = configManager.getConfig();
         if (config.joinMsg.worldChangeEnabled && onlinePlayers.contains(playerId)) {
             String message = configManager.getMessage("worldLeaveMessage", "player", playerName, "world", worldName);
             if (message != null && !message.isEmpty()) {
-                broadcastMessage(message, "#AAAAAA");
+                broadcastMessage(message, "#AAAAAA", playerRef);
             }
         }
     }
-    
+
     /**
      * Handle player being added to a world.
      * This fires for both initial joins AND world changes.
      */
     private void onPlayerAddToWorld(AddPlayerToWorldEvent event) {
         PluginConfig config = configManager.getConfig();
-        
+
         // Always suppress default Hytale join messages if configured
         if (config.joinMsg.suppressDefaultMessages) {
             event.setBroadcastJoinMessage(false);
         }
-        
+
         Holder<EntityStore> holder = event.getHolder();
         if (holder == null) {
             return;
         }
-        
+
         PlayerRef playerRef = holder.getComponent(PlayerRef.getComponentType());
         if (playerRef == null) {
             return;
         }
-        
+
         UUID playerId = playerRef.getUuid();
         String playerName = playerRef.getUsername();
         String worldName = event.getWorld() != null ? event.getWorld().getName() : "unknown";
-        
+
         // Check if this is a world change using multiple methods:
         // 1. DrainPlayerFromWorldEvent set the flag (preferred)
         // 2. Player is online and entering a different world than they were in
         boolean isWorldChange = worldChangingPlayers.remove(playerId);
-        
+
         // Fallback: If drain event didn't fire, check if player is online and world changed
         if (!isWorldChange && onlinePlayers.contains(playerId)) {
             String lastWorld = playerLastWorld.get(playerId);
@@ -218,25 +218,25 @@ public class JoinQuitListener {
                 isWorldChange = true;
             }
         }
-        
+
         // Update last world tracking
         playerLastWorld.put(playerId, worldName);
-        
+
         // If player was draining (world change), show world MOTD and broadcast
         if (isWorldChange) {
             // Broadcast world join message if enabled
             if (config.joinMsg.worldChangeEnabled) {
                 String message = configManager.getMessage("worldJoinMessage", "player", playerName, "world", worldName);
                 if (message != null && !message.isEmpty()) {
-                    broadcastMessage(message, "#AAAAAA");
+                    broadcastMessage(message, "#AAAAAA", playerRef);
                 }
             }
-            
+
             // Show world-specific MOTD if configured
             showWorldMotd(playerRef, worldName);
         }
     }
-    
+
     /**
      * Handle player join event (initial server join).
      * Uses world.execute() to ensure thread safety when accessing store components.
@@ -246,40 +246,40 @@ public class JoinQuitListener {
         if (!ref.isValid()) {
             return;
         }
-        
+
         var store = ref.getStore();
-        
+
         // Get world for thread-safe execution
         EntityStore entityStore = store.getExternalData();
         World world = entityStore.getWorld();
-        
+
         // Execute on world thread to ensure thread safety
         world.execute(() -> {
             if (!ref.isValid()) {
                 return;
             }
-            
+
             PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
             if (playerRef == null) {
                 return;
             }
-            
+
             UUID playerId = playerRef.getUuid();
             String playerName = playerRef.getUsername();
             String worldName = world.getName();
             PluginConfig config = configManager.getConfig();
-            
+
             // Check if already online (prevents duplicate join messages on world change)
             if (onlinePlayers.contains(playerId)) {
                 return;
             }
-            
+
             // Override default Hytale join/leave translations with our custom messages
             // This replaces the built-in "player has joined/left world" with our configured messages
             if (config.joinMsg.suppressDefaultMessages) {
                 sendTranslationOverrides(playerRef);
             }
-            
+
             // Track as online - this is a real server join
             onlinePlayers.add(playerId);
             // Clear any world change flag
@@ -288,17 +288,17 @@ public class JoinQuitListener {
             seenWorldMotds.remove(playerId);
             // Set initial world for world change detection
             playerLastWorld.put(playerId, worldName);
-            
+
             // Update player cache
             playerService.onPlayerJoin(playerId, playerName);
-            
+
             // Hide vanished players from this joining player and check if they were vanished
             boolean playerIsVanished = false;
             if (vanishService != null) {
                 playerIsVanished = vanishService.onPlayerJoin(playerRef);
                 // Also set up map filter to hide vanished players from the map
                 vanishService.onPlayerReady(store, ref);
-                
+
                 // Send vanish reminder if player reconnected while vanished
                 if (playerIsVanished && config.vanish.showReminderOnJoin) {
                     // Delay the reminder so it appears after the MOTD
@@ -307,13 +307,13 @@ public class JoinQuitListener {
                     }, 2000, TimeUnit.MILLISECONDS);
                 }
             }
-            
+
             // Notify playtime reward service
             PlayTimeRewardService rewardService = EliteEssentials.getInstance().getPlayTimeRewardService();
             if (rewardService != null) {
                 rewardService.onPlayerJoin(playerId);
             }
-            
+
             // Check if first join by checking if player file existed on disk before this session
             // We check the file directly because playerService.onPlayerJoin() just created it
             boolean isFirstJoin = false;
@@ -325,32 +325,32 @@ public class JoinQuitListener {
                     // If firstJoin was set within the last 10 seconds, this is a new player
                     // Using 10 seconds to account for any delays in event processing
                     isFirstJoin = (now - firstJoinTime) < 10000;
-                    
+
                     if (configManager.isDebugEnabled()) {
-                        logger.info("[FirstJoin] Player " + playerName + " firstJoinTime=" + firstJoinTime + 
-                            ", now=" + now + ", diff=" + (now - firstJoinTime) + "ms, isFirstJoin=" + isFirstJoin);
+                        logger.info("[FirstJoin] Player " + playerName + " firstJoinTime=" + firstJoinTime +
+                                ", now=" + now + ", diff=" + (now - firstJoinTime) + "ms, isFirstJoin=" + isFirstJoin);
                     }
                 }
             }
-            
+
             if (isFirstJoin) {
                 // Broadcast first join message (unless player is vanished)
                 if (config.joinMsg.firstJoinEnabled && !playerIsVanished) {
                     String message = configManager.getMessage("firstJoinMessage", "player", playerName);
-                    broadcastMessage(message, "#FFFF55");
+                    broadcastMessage(message, "#FFFF55", playerRef);
                 }
-                
+
                 // Teleport first-time players to spawn if enabled
                 if (config.spawn.teleportOnFirstJoin && spawnStorage != null) {
                     // Determine which world's spawn to use based on perWorld setting
                     String targetWorldName = config.spawn.perWorld ? worldName : config.spawn.mainWorld;
                     SpawnStorage.SpawnData spawn = spawnStorage.getSpawn(targetWorldName);
-                    
+
                     if (spawn != null) {
                         try {
                             Vector3d spawnPos = new Vector3d(spawn.x, spawn.y, spawn.z);
                             Vector3f spawnRot = new Vector3f(0, spawn.yaw, 0); // pitch=0, yaw, roll=0
-                            
+
                             // Check if spawn is in a different world
                             if (!targetWorldName.equalsIgnoreCase(worldName)) {
                                 // Cross-world teleport needs a delay to let player fully load first
@@ -364,42 +364,42 @@ public class JoinQuitListener {
                                                 logger.warning("[FirstJoin] Player ref no longer valid for cross-world teleport");
                                                 return;
                                             }
-                                            
+
                                             World targetWorld = findWorldByName(finalTargetWorldName);
                                             if (targetWorld != null) {
                                                 Teleport teleport = new Teleport(targetWorld, spawnPos, spawnRot);
                                                 store.putComponent(ref, Teleport.getComponentType(), teleport);
-                                                
-                                                logger.info("[FirstJoin] Teleported new player " + finalPlayerName + 
-                                                    " to spawn in world '" + finalTargetWorldName + "' at " +
-                                                    String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+
+                                                logger.info("[FirstJoin] Teleported new player " + finalPlayerName +
+                                                        " to spawn in world '" + finalTargetWorldName + "' at " +
+                                                        String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
                                             } else {
-                                                logger.warning("[FirstJoin] Target world '" + finalTargetWorldName + 
-                                                    "' not found. Player " + finalPlayerName + " spawned at default location.");
+                                                logger.warning("[FirstJoin] Target world '" + finalTargetWorldName +
+                                                        "' not found. Player " + finalPlayerName + " spawned at default location.");
                                             }
                                         } catch (Exception e) {
                                             logger.warning("[FirstJoin] Failed cross-world teleport for " + finalPlayerName + ": " + e.getMessage());
                                         }
                                     });
                                 }, 1, TimeUnit.SECONDS);
-                                
-                                logger.info("[FirstJoin] Scheduled cross-world teleport for " + playerName + 
-                                    " to world '" + targetWorldName + "' in 1 second");
+
+                                logger.info("[FirstJoin] Scheduled cross-world teleport for " + playerName +
+                                        " to world '" + targetWorldName + "' in 1 second");
                             } else {
                                 // Same world teleport - can do immediately
                                 Teleport teleport = new Teleport(spawnPos, spawnRot);
                                 store.putComponent(ref, Teleport.getComponentType(), teleport);
-                                
+
                                 logger.info("[FirstJoin] Teleported new player " + playerName + " to spawn at " +
-                                    String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                        String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
                             }
                         } catch (Exception e) {
                             logger.warning("[FirstJoin] Failed to teleport " + playerName + " to spawn: " + e.getMessage());
                         }
                     } else {
                         if (configManager.isDebugEnabled()) {
-                            logger.info("[FirstJoin] No spawn set for world '" + targetWorldName + 
-                                "', new player " + playerName + " spawned at default location");
+                            logger.info("[FirstJoin] No spawn set for world '" + targetWorldName +
+                                    "', new player " + playerName + " spawned at default location");
                         }
                     }
                 }
@@ -410,10 +410,10 @@ public class JoinQuitListener {
                     boolean shouldSuppress = playerIsVanished && config.vanish.suppressJoinQuitMessages;
                     if (!shouldSuppress) {
                         String message = configManager.getMessage("joinMessage", "player", playerName);
-                        broadcastMessage(message, "#55FF55");
+                        broadcastMessage(message, "#55FF55", playerRef);
                     }
                 }
-                
+
                 // Teleport returning players to spawn on every login if enabled
                 if (config.spawn.teleportOnEveryLogin && spawnStorage != null) {
                     // Determine which world's spawn to use based on perWorld setting
@@ -421,12 +421,12 @@ public class JoinQuitListener {
                     // When perWorld=true, use current world's spawn
                     String targetWorldName = config.spawn.perWorld ? worldName : config.spawn.mainWorld;
                     SpawnStorage.SpawnData spawn = spawnStorage.getSpawn(targetWorldName);
-                    
+
                     if (spawn != null) {
                         try {
                             Vector3d spawnPos = new Vector3d(spawn.x, spawn.y, spawn.z);
                             Vector3f spawnRot = new Vector3f(0, spawn.yaw, 0); // pitch=0, yaw, roll=0
-                            
+
                             // Check if spawn is in a different world
                             if (!targetWorldName.equalsIgnoreCase(worldName)) {
                                 // Cross-world teleport needs a delay to let player fully load first
@@ -439,39 +439,39 @@ public class JoinQuitListener {
                                                 logger.warning("[SpawnOnLogin] Player ref no longer valid for cross-world teleport");
                                                 return;
                                             }
-                                            
+
                                             World targetWorld = findWorldByName(finalTargetWorldName);
                                             if (targetWorld != null) {
                                                 Teleport teleport = new Teleport(targetWorld, spawnPos, spawnRot);
                                                 store.putComponent(ref, Teleport.getComponentType(), teleport);
-                                                
+
                                                 if (configManager.isDebugEnabled()) {
-                                                    logger.info("[SpawnOnLogin] Teleported " + finalPlayerName + 
-                                                        " to spawn in world '" + finalTargetWorldName + "' at " +
-                                                        String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                                    logger.info("[SpawnOnLogin] Teleported " + finalPlayerName +
+                                                            " to spawn in world '" + finalTargetWorldName + "' at " +
+                                                            String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
                                                 }
                                             } else {
-                                                logger.warning("[SpawnOnLogin] Target world '" + finalTargetWorldName + 
-                                                    "' not found for player " + finalPlayerName);
+                                                logger.warning("[SpawnOnLogin] Target world '" + finalTargetWorldName +
+                                                        "' not found for player " + finalPlayerName);
                                             }
                                         } catch (Exception e) {
                                             logger.warning("[SpawnOnLogin] Failed cross-world teleport for " + finalPlayerName + ": " + e.getMessage());
                                         }
                                     });
                                 }, 1, TimeUnit.SECONDS);
-                                
+
                                 if (configManager.isDebugEnabled()) {
-                                    logger.info("[SpawnOnLogin] Scheduled cross-world teleport for " + playerName + 
-                                        " to world '" + targetWorldName + "'");
+                                    logger.info("[SpawnOnLogin] Scheduled cross-world teleport for " + playerName +
+                                            " to world '" + targetWorldName + "'");
                                 }
                             } else {
                                 // Same world teleport - can do immediately
                                 Teleport teleport = new Teleport(spawnPos, spawnRot);
                                 store.putComponent(ref, Teleport.getComponentType(), teleport);
-                                
+
                                 if (configManager.isDebugEnabled()) {
                                     logger.info("[SpawnOnLogin] Teleported " + playerName + " to spawn at " +
-                                        String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
+                                            String.format("%.1f, %.1f, %.1f", spawn.x, spawn.y, spawn.z));
                                 }
                             }
                         } catch (Exception e) {
@@ -479,13 +479,13 @@ public class JoinQuitListener {
                         }
                     } else {
                         if (configManager.isDebugEnabled()) {
-                            logger.info("[SpawnOnLogin] No spawn set for world '" + targetWorldName + 
-                                "', player " + playerName + " spawned at logout location");
+                            logger.info("[SpawnOnLogin] No spawn set for world '" + targetWorldName +
+                                    "', player " + playerName + " spawned at logout location");
                         }
                     }
                 }
             }
-            
+
             // Show global MOTD (only on server join, not world changes)
             if (config.motd.enabled && config.motd.showOnJoin) {
                 int delay = config.motd.delaySeconds;
@@ -497,10 +497,10 @@ public class JoinQuitListener {
                     showGlobalMotd(playerRef, worldName);
                 }
             }
-            
+
             // Also show world-specific MOTD for the initial world
             showWorldMotd(playerRef, worldName);
-            
+
             // Notify about unread mail
             if (config.mail.enabled && config.mail.notifyOnLogin && mailService != null) {
                 int unreadCount = mailService.getUnreadCount(playerId);
@@ -508,15 +508,15 @@ public class JoinQuitListener {
                     int mailDelay = config.mail.notifyDelaySeconds;
                     final int finalUnreadCount = unreadCount;
                     scheduler.schedule(() -> {
-                        String mailMsg = configManager.getMessage("mailNotifyLogin", 
-                            "count", String.valueOf(finalUnreadCount));
+                        String mailMsg = configManager.getMessage("mailNotifyLogin",
+                                "count", String.valueOf(finalUnreadCount));
                         playerRef.sendMessage(MessageFormatter.format(mailMsg));
                     }, mailDelay, TimeUnit.SECONDS);
                 }
             }
         });
     }
-    
+
     /**
      * Handle player quit event (actual server disconnect).
      * Updates player cache with last seen time and play time.
@@ -526,10 +526,10 @@ public class JoinQuitListener {
         if (playerRef == null) {
             return;
         }
-        
+
         UUID playerId = playerRef.getUuid();
         String playerName = playerRef.getUsername();
-        
+
         // Guard against duplicate disconnect events - only process if player was actually online
         // This prevents duplicate quit messages when the server fires multiple disconnect events
         boolean wasOnline = onlinePlayers.remove(playerId);
@@ -537,29 +537,29 @@ public class JoinQuitListener {
             // Already processed this disconnect, skip
             return;
         }
-        
+
         // Clean up tracking data
         worldChangingPlayers.remove(playerId);
         // Clear seen world MOTDs when player disconnects
         seenWorldMotds.remove(playerId);
         // Clear last world tracking
         playerLastWorld.remove(playerId);
-        
+
         // Notify playtime reward service before updating player cache
         PlayTimeRewardService rewardService = EliteEssentials.getInstance().getPlayTimeRewardService();
         if (rewardService != null) {
             rewardService.onPlayerQuit(playerId);
         }
-        
+
         // Update player cache (last seen, play time)
         playerService.onPlayerQuit(playerId);
-        
+
         // Check if player was vanished before cleaning up vanish state
         boolean wasVanished = false;
         if (vanishService != null) {
             wasVanished = vanishService.onPlayerLeave(playerId);
         }
-        
+
         // Broadcast quit message if enabled (unless player was vanished)
         PluginConfig config = configManager.getConfig();
         if (config.joinMsg.quitEnabled) {
@@ -567,60 +567,64 @@ public class JoinQuitListener {
             boolean shouldSuppress = wasVanished && config.vanish.suppressJoinQuitMessages;
             if (!shouldSuppress) {
                 String message = configManager.getMessage("quitMessage", "player", playerName);
-                broadcastMessage(message, "#FF5555");
+                broadcastMessage(message, "#FF5555", playerRef);
             }
         }
     }
-    
+
     /**
      * Show global MOTD to player (server join MOTD).
      */
     private void showGlobalMotd(PlayerRef playerRef, String worldName) {
         PluginConfig config = configManager.getConfig();
-        
+
         // Get MOTD lines
         List<String> motdLines = motdStorage.getMotdLines();
         if (motdLines.isEmpty()) {
             return;
         }
-        
+
         // Replace placeholders
         String playerName = playerRef.getUsername();
         String serverName = config.motd.serverName;
         int playerCount = Universe.get().getPlayers().size();
-        
+
         // Send each line with formatting
         for (String line : motdLines) {
             // Skip completely empty lines to avoid excessive spacing
             if (line.trim().isEmpty()) {
                 continue;
             }
-            
+
             String processedLine = line
                     .replace("{player}", playerName)
                     .replace("{server}", serverName)
                     .replace("{world}", worldName)
                     .replace("{playercount}", String.valueOf(playerCount));
-            
+
+            if (configManager.getConfig().chatFormat.placeholderapi) {
+                processedLine = PAPIIntegration.setPlaceholders(playerRef, processedLine);
+            }
+
             playerRef.sendMessage(MessageFormatter.format(processedLine));
         }
     }
-    
+
     /**
      * Show world-specific MOTD to player.
      * Respects showAlways setting - if false, only shows once per session.
      */
     private void showWorldMotd(PlayerRef playerRef, String worldName) {
         if (playerRef == null || worldName == null) return;
-        
+
         // Check if world has a configured MOTD
         MotdStorage.WorldMotd worldMotd = motdStorage.getWorldMotd(worldName);
         if (worldMotd == null || !worldMotd.enabled || worldMotd.lines == null || worldMotd.lines.isEmpty()) {
             return;
         }
-        
+
         UUID playerId = playerRef.getUuid();
-        
+
         // Check if we should show this MOTD
         if (!worldMotd.showAlways) {
             // Only show once per session - check if player has already seen it
@@ -630,56 +634,62 @@ public class JoinQuitListener {
             }
             seenWorlds.add(worldName.toLowerCase());
         }
-        
+
         // Replace placeholders and send
         PluginConfig config = configManager.getConfig();
         String playerName = playerRef.getUsername();
         String serverName = config.motd.serverName;
         int playerCount = Universe.get().getPlayers().size();
-        
+
         for (String line : worldMotd.lines) {
             if (line.trim().isEmpty()) {
                 continue;
             }
-            
+
             String processedLine = line
                     .replace("{player}", playerName)
                     .replace("{server}", serverName)
                     .replace("{world}", worldName)
                     .replace("{playercount}", String.valueOf(playerCount));
-            
+
+            if (configManager.getConfig().chatFormat.placeholderapi) {
+                processedLine = PAPIIntegration.setPlaceholders(playerRef, processedLine);
+            }
+
             playerRef.sendMessage(MessageFormatter.format(processedLine));
         }
     }
-    
+
     /**
      * Schedule global MOTD display after delay.
      */
     private void scheduleGlobalMotd(PlayerRef playerRef, int delaySeconds, String worldName) {
         scheduler.schedule(() -> showGlobalMotd(playerRef, worldName), delaySeconds, TimeUnit.SECONDS);
     }
-    
+
     /**
      * Broadcast message to all online players.
      */
-    private void broadcastMessage(String text, String color) {
-        // Use MessageFormatter to process color codes in the text
-        Message message = MessageFormatter.format(text);
-        
+    private void broadcastMessage(String text, String color, @Nullable PlayerRef sender) {
         // Get all online players and broadcast
         try {
             Universe universe = Universe.get();
             if (universe != null) {
                 var players = universe.getPlayers();
                 for (PlayerRef player : players) {
-                    player.sendMessage(message);
+                    if (configManager.getConfig().chatFormat.placeholderapi && sender != null) {
+                        text = PAPIIntegration.setRelationalPlaceholders(sender, player, PAPIIntegration.setPlaceholders(sender, text));
+                    }
+
+                    // Use MessageFormatter to process color codes in the text
+                    player.sendMessage(MessageFormatter.format(text));
                 }
             }
         } catch (Exception e) {
             logger.warning("Could not broadcast message: " + e.getMessage());
         }
     }
-    
+
     /**
      * Shutdown the executor service for clean plugin unload.
      */
@@ -694,39 +704,39 @@ public class JoinQuitListener {
             Thread.currentThread().interrupt();
         }
     }
-    
+
     /**
      * Send translation overrides to a player to blank out default Hytale join/leave messages.
      * This uses the UpdateTranslations packet to override the client's translation strings
      * with empty strings, effectively hiding the built-in messages.
-     * 
+     *
      * Our custom join/quit messages are sent separately via broadcastMessage() which
      * supports color codes and formatting.
-     * 
+     *
      * Note: This results in a blank line in chat, but allows us to use colored messages.
      */
     private void sendTranslationOverrides(PlayerRef playerRef) {
         if (playerRef == null) return;
-        
+
         try {
             Map<String, String> overrides = new HashMap<>();
-            
+
             // Blank out the default messages - we send our own colored messages separately
             overrides.put(TRANSLATION_KEY_JOINED_WORLD, "");
             overrides.put(TRANSLATION_KEY_LEFT_WORLD, "");
-            
+
             UpdateTranslations packet = new UpdateTranslations(UpdateType.AddOrUpdate, overrides);
             playerRef.getPacketHandler().write(packet);
-            
+
             if (configManager.isDebugEnabled()) {
-                logger.info("Sent translation overrides to " + playerRef.getUsername() 
+                logger.info("Sent translation overrides to " + playerRef.getUsername()
                         + " - blanked join/leave messages");
             }
         } catch (Exception e) {
             logger.warning("Failed to send translation overrides: " + e.getMessage());
         }
     }
-    
+
     /**
      * Send translation overrides to all online players.
      * Called on reload to update all players with new message formats.
@@ -736,7 +746,7 @@ public class JoinQuitListener {
         if (!config.joinMsg.suppressDefaultMessages) {
             return;
         }
-        
+
         try {
             Universe universe = Universe.get();
             if (universe != null) {
@@ -748,7 +758,7 @@ public class JoinQuitListener {
             logger.warning("Failed to send translation overrides to all players: " + e.getMessage());
         }
     }
-    
+
     /**
      * Find a world by name (case-insensitive).
      * @param worldName The name of the world to find
@@ -756,11 +766,11 @@ public class JoinQuitListener {
      */
     private World findWorldByName(String worldName) {
         if (worldName == null) return null;
-        
+
         try {
             Universe universe = Universe.get();
             if (universe == null) return null;
-            
+
             for (World w : universe.getWorlds().values()) {
                 if (w.getName().equalsIgnoreCase(worldName)) {
                     return w;
