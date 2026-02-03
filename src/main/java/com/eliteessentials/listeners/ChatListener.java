@@ -88,8 +88,9 @@ public class ChatListener {
         String formattedMessage = format
                 .replace("{player}", playerName)
                 .replace("{displayname}", playerName);
+        boolean isPapiAvailable = PAPIIntegration.available() && configManager.getConfig().chatFormat.placeholderapi;
 
-        if (PAPIIntegration.available() && configManager.getConfig().chatFormat.placeholderapi && formattedMessage.indexOf('%') != -1) {
+        if (isPapiAvailable) {
             formattedMessage = PAPIIntegration.setPlaceholders(sender, formattedMessage);
         }
         
@@ -99,8 +100,12 @@ public class ChatListener {
         
         // Broadcast the formatted message to all players
         for (PlayerRef player : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
-            String replacedMessage = PAPIIntegration.setRelationalPlaceholders(sender, player, formattedMessage.replace("{message}", processedMessage));
-            Message message = MessageFormatter.format(replacedMessage);
+            if (isPapiAvailable) {
+                formattedMessage = PAPIIntegration.setRelationalPlaceholders(sender, player, formattedMessage);
+            }
+            
+            formattedMessage = formattedMessage.replace("{message}", processedMessage);
+            Message message = MessageFormatter.format(formattedMessage);
             player.sendMessage(message);
         }
         
