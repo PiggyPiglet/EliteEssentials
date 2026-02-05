@@ -13,6 +13,10 @@ repositories {
     mavenCentral()
 
     maven("https://repo.helpch.at/releases")
+
+    // Official Hytale Maven repository
+    maven( "https://maven.hytale.com/release")
+    maven( "https://maven.hytale.com/pre-release")
     
     // VaultUnlocked API repository
     maven("https://repo.codemc.io/repository/creatorfromhell/") {
@@ -22,9 +26,12 @@ repositories {
 
 dependencies {
     // Hytale Server API (provided by server at runtime)
-    compileOnly(files("hytaleserver.jar"))
+    compileOnly("com.hypixel.hytale:Server:2026.01.24-6e2d4fc36")
 
     compileOnly("at.helpch:placeholderapi-hytale:1.0.4")
+
+    // Luckperms Support
+    compileOnly("net.luckperms:api:5.4")
     
     // VaultUnlocked - compileOnly since it's provided by server at runtime
     compileOnly("net.cfh.vault:VaultUnlocked:2.18.3")
