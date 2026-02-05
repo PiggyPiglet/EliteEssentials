@@ -46,6 +46,7 @@ Commands are either available to Everyone or Admin only:
 | `/fly` | Toggle flight mode | Admin |
 | `/flyspeed <speed>` | Set fly speed (10-100) | Admin |
 | `/broadcast <message>` | Server announcement | Admin |
+| `/clearchat` | Clear chat for all players | Admin |
 | `/clearinv [player]` | Clear inventory | Admin |
 | `/sleeppercent [%]` | Set sleep percentage | Admin |
 | `/wallet` | View your balance | Everyone |
@@ -163,6 +164,7 @@ eliteessentials
 │   │   ├── fly                     # /fly command (Admin)
 │   │   ├── flyspeed                # /flyspeed command (Admin)
 │   │   ├── broadcast               # /broadcast command (Admin)
+│   │   ├── clearchat               # /clearchat command (Admin)
 │   │   ├── clearinv                # /clearinv command (Admin)
 │   │   └── sleeppercent            # /sleeppercent command (Admin)
 │   │
@@ -285,6 +287,7 @@ eliteessentials
 | `eliteessentials.command.misc.fly` | Toggle flight mode (Admin) |
 | `eliteessentials.command.misc.flyspeed` | Set fly speed (Admin) |
 | `eliteessentials.command.misc.broadcast` | Server announcements (Admin) |
+| `eliteessentials.command.misc.clearchat` | Clear chat for all players (Admin) |
 | `eliteessentials.command.misc.clearinv` | Clear inventory (Admin) |
 | `eliteessentials.command.misc.repair` | Repair items (Admin) |
 | `eliteessentials.command.misc.repair.all` | Repair all items (Admin) |
@@ -362,6 +365,7 @@ eliteessentials.command.misc.fly
 eliteessentials.command.misc.heal
 eliteessentials.command.misc.god
 eliteessentials.command.misc.broadcast
+eliteessentials.command.misc.clearchat
 eliteessentials.command.tp.top
 eliteessentials.command.tp.tphere
 eliteessentials.command.spawn.protection.bypass

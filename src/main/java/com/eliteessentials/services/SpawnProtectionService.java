@@ -74,6 +74,28 @@ public class SpawnProtectionService {
     public boolean isAllDamageProtectionEnabled() {
         return configManager.getConfig().spawnProtection.disableAllDamage;
     }
+    
+    /**
+     * Check if block interactions are disabled in spawn area.
+     */
+    public boolean isInteractionProtectionEnabled() {
+        return configManager.getConfig().spawnProtection.disableInteractions;
+    }
+    
+    /**
+     * Check if item pickups are disabled in spawn area.
+     * NOTE: May not work properly due to Hytale API limitations.
+     */
+    public boolean isItemPickupProtectionEnabled() {
+        return configManager.getConfig().spawnProtection.disableItemPickup;
+    }
+    
+    /**
+     * Check if item drops are disabled in spawn area.
+     */
+    public boolean isItemDropProtectionEnabled() {
+        return configManager.getConfig().spawnProtection.disableItemDrop;
+    }
 
     /**
      * Get the protection radius.

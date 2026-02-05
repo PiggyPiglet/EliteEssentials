@@ -8,7 +8,6 @@ import com.hypixel.hytale.builtin.beds.sleep.resources.WorldSlumber;
 import com.hypixel.hytale.builtin.beds.sleep.resources.WorldSomnolence;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.asset.type.gameplay.SleepConfig;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -20,6 +19,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -35,9 +36,20 @@ public class SleepService {
 
     private final ConfigManager configManager;
     private final ScheduledExecutorService scheduler;
-    private volatile boolean slumberTriggered = false;
-    private volatile int lastSleepingCount = -1;
     private volatile boolean initialized = false;
+    
+    // Per-world sleep state tracking to prevent race conditions
+    private final Map<String, WorldSleepState> worldSleepStates = new ConcurrentHashMap<>();
+    
+    private static class WorldSleepState {
+        volatile boolean slumberTriggered = false;
+        volatile int lastSleepingCount = -1;
+        
+        void reset() {
+            slumberTriggered = false;
+            lastSleepingCount = -1;
+        }
+    }
 
     public SleepService(ConfigManager configManager) {
         this.configManager = configManager;
@@ -80,6 +92,10 @@ public class SleepService {
     }
 
     private void checkWorldSleep(World world, int requiredPercent) {
+        // Get or create per-world state BEFORE entering world.execute()
+        String worldName = world.getName();
+        WorldSleepState sleepState = worldSleepStates.computeIfAbsent(worldName, k -> new WorldSleepState());
+        
         world.execute(() -> {
             try {
                 EntityStore entityStore = world.getEntityStore();
@@ -109,18 +125,28 @@ public class SleepService {
                 
                 Instant gameTime = timeResource.getGameTime();
                 
-                // Check if it's nighttime (between sleep start hour and wake up hour)
-                // Sleep is allowed from 9 PM (21:00) to 5 AM (05:00)
+                // Check if it's nighttime based on config settings
+                // Default: Sleep is allowed from 9 PM (21:00) to 5 AM (05:00)
                 LocalDateTime currentDateTime = LocalDateTime.ofInstant(gameTime, ZoneOffset.UTC);
-                int currentHour = currentDateTime.getHour();
+                double currentFractionalHour = currentDateTime.getHour() + currentDateTime.getMinute() / 60.0;
                 
-                // Nighttime: hour >= 21 OR hour < 5
-                // Daytime: hour >= 5 AND hour < 21
-                boolean isDaytime = currentHour >= 5 && currentHour < 21;
-                if (isDaytime) {
+                double nightStart = configManager.getConfig().sleep.nightStartHour;
+                double morningHour = configManager.getConfig().sleep.morningHour;
+                
+                // Nighttime check depends on whether night spans midnight
+                // If nightStart > morningHour (e.g., 21 to 5), night spans midnight
+                boolean isNighttime;
+                if (nightStart > morningHour) {
+                    // Night spans midnight: hour >= nightStart OR hour < morningHour
+                    isNighttime = currentFractionalHour >= nightStart || currentFractionalHour < morningHour;
+                } else {
+                    // Night doesn't span midnight (unusual but supported)
+                    isNighttime = currentFractionalHour >= nightStart && currentFractionalHour < morningHour;
+                }
+                
+                if (!isNighttime) {
                     // Reset flags during daytime
-                    slumberTriggered = false;
-                    lastSleepingCount = -1;
+                    sleepState.reset();
                     return;
                 }
                 
@@ -148,22 +174,24 @@ public class SleepService {
                 
                 // Reset when no one is sleeping
                 if (sleepingPlayers == 0) {
-                    slumberTriggered = false;
-                    lastSleepingCount = -1;
+                    sleepState.reset();
                     return;
                 }
                 // Calculate percentage and check threshold
                 int currentPercent = (sleepingPlayers * 100) / totalPlayers;
                 int playersNeeded = Math.max(1, (int) Math.ceil(totalPlayers * requiredPercent / 100.0));
                 
-                if (currentPercent >= requiredPercent && !slumberTriggered) {
-                    triggerSlumber(store, world, worldSomnolence, players, sleepingPlayers, playersNeeded);
-                    slumberTriggered = true;
-                    lastSleepingCount = sleepingPlayers;
-                } else if (sleepingPlayers != lastSleepingCount && !slumberTriggered && sleepingPlayers > 0) {
-                    // Only send message if count changed, slumber not triggered, and someone is sleeping
-                    lastSleepingCount = sleepingPlayers;
-                    sendSleepMessage(players, sleepingPlayers, playersNeeded);
+                // Synchronized block to prevent race conditions between check and update
+                synchronized (sleepState) {
+                    if (currentPercent >= requiredPercent && !sleepState.slumberTriggered) {
+                        triggerSlumber(store, world, worldSomnolence, players, sleepingPlayers, playersNeeded);
+                        sleepState.slumberTriggered = true;
+                        sleepState.lastSleepingCount = sleepingPlayers;
+                    } else if (sleepingPlayers != sleepState.lastSleepingCount && !sleepState.slumberTriggered && sleepingPlayers > 0) {
+                        // Only send message if count changed, slumber not triggered, and someone is sleeping
+                        sleepState.lastSleepingCount = sleepingPlayers;
+                        sendSleepMessage(players, sleepingPlayers, playersNeeded);
+                    }
                 }
                 
             } catch (Exception e) {
@@ -196,9 +224,9 @@ public class SleepService {
         
         WorldTimeResource timeResource = store.getResource(WorldTimeResource.getResourceType());
         
-        // Get wake-up hour from game config
-        SleepConfig sleepConfig = world.getGameplayConfig().getWorldConfig().getSleepConfig();
-        float wakeUpHour = sleepConfig.getWakeUpHour();
+        // Use configured morning hour instead of game default (supports decimal for minutes)
+        double configuredMorningHour = configManager.getConfig().sleep.morningHour;
+        float wakeUpHour = (float) configuredMorningHour;
         
         Instant currentTime = timeResource.getGameTime();
         Instant wakeUpTime = computeWakeupInstant(currentTime, wakeUpHour);

@@ -115,13 +115,16 @@ public class CommandPermissionUtil {
     }
 
     /**
-     * Get the effective warmup for a player (0 if they can bypass).
+     * Get the effective warmup for a player.
+     * 
+     * Priority:
+     * 1. Bypass permission (returns 0)
+     * 2. LuckPerms permission-based warmup (any value)
+     * 3. Config default
      */
     public static int getEffectiveWarmup(UUID playerId, String commandName, int configWarmup) {
-        if (canBypassWarmup(playerId, commandName)) {
-            return 0;
-        }
-        return configWarmup;
+        // Use PermissionService to get warmup (handles bypass + LuckPerms lookup)
+        return PermissionService.get().getTpCommandWarmup(playerId, commandName, configWarmup);
     }
 
     /**

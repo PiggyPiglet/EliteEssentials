@@ -549,6 +549,12 @@ public class EliteEssentials extends JavaPlugin {
             registeredCommands.append("/broadcast, ");
         }
         
+        // Clear chat command
+        if (config.clearChat.enabled) {
+            getCommandRegistry().registerCommand(new HytaleClearChatCommand(configManager));
+            registeredCommands.append("/clearchat, ");
+        }
+        
         // Clear inventory command
         if (config.clearInv.enabled) {
             getCommandRegistry().registerCommand(new HytaleClearInvCommand(configManager, cooldownService));

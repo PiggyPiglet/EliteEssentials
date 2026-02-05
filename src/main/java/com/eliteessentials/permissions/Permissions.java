@@ -38,6 +38,8 @@ public final class Permissions {
     public static final String HOME_BYPASS = HOME_CATEGORY + ".bypass";
     public static final String HOME_BYPASS_COOLDOWN = HOME_BYPASS + ".cooldown";
     public static final String HOME_BYPASS_WARMUP = HOME_BYPASS + ".warmup";
+    // Home warmup overrides: eliteessentials.command.home.warmup.<seconds>
+    public static final String HOME_WARMUP_PREFIX = HOME_CATEGORY + ".warmup.";
 
     // ==================== TELEPORT CATEGORY ====================
     // eliteessentials.command.tp.*
@@ -63,6 +65,8 @@ public final class Permissions {
     
     // TP cooldown overrides: eliteessentials.command.tp.cooldown.<cmd>.<seconds>
     public static final String TP_COOLDOWN_PREFIX = TP_CATEGORY + ".cooldown.";
+    // TP warmup overrides: eliteessentials.command.tp.warmup.<cmd>.<seconds>
+    public static final String TP_WARMUP_PREFIX = TP_CATEGORY + ".warmup.";
 
     // ==================== WARP CATEGORY ====================
     // eliteessentials.command.warp.*
@@ -86,6 +90,8 @@ public final class Permissions {
     public static final String WARP_BYPASS = WARP_CATEGORY + ".bypass";
     public static final String WARP_BYPASS_COOLDOWN = WARP_BYPASS + ".cooldown";
     public static final String WARP_BYPASS_WARMUP = WARP_BYPASS + ".warmup";
+    // Warp warmup overrides: eliteessentials.command.warp.warmup.<seconds>
+    public static final String WARP_WARMUP_PREFIX = WARP_CATEGORY + ".warmup.";
 
     // ==================== SPAWN CATEGORY ====================
     // eliteessentials.command.spawn.*
@@ -98,6 +104,8 @@ public final class Permissions {
     public static final String SPAWN_BYPASS = SPAWN_CATEGORY + ".bypass";
     public static final String SPAWN_BYPASS_COOLDOWN = SPAWN_BYPASS + ".cooldown";
     public static final String SPAWN_BYPASS_WARMUP = SPAWN_BYPASS + ".warmup";
+    // Spawn warmup overrides: eliteessentials.command.spawn.warmup.<seconds>
+    public static final String SPAWN_WARMUP_PREFIX = SPAWN_CATEGORY + ".warmup.";
 
     // ==================== MISC CATEGORY ====================
     // eliteessentials.command.misc.*
@@ -130,6 +138,7 @@ public final class Permissions {
     public static final String EEHELP = MISC_CATEGORY + ".eehelp";
     public static final String VANISH = MISC_CATEGORY + ".vanish";
     public static final String REPAIR = MISC_CATEGORY + ".repair";
+    public static final String CLEARCHAT = MISC_CATEGORY + ".clearchat";
     public static final String REPAIR_ALL = MISC_CATEGORY + ".repair.all";
     public static final String REPAIR_BYPASS_COOLDOWN = MISC_CATEGORY + ".repair.bypass.cooldown";
     public static final String REPAIR_COOLDOWN_PREFIX = MISC_CATEGORY + ".repair.cooldown.";
@@ -332,6 +341,43 @@ public final class Permissions {
      */
     public static String tpCooldown(String command, int seconds) {
         return TP_COOLDOWN_PREFIX + command + "." + seconds;
+    }
+    
+    /**
+     * Get warmup override permission for a tp command.
+     * @param command Command name (e.g., "rtp", "back", "tpa")
+     * @param seconds Warmup in seconds
+     * @return eliteessentials.command.tp.warmup.<command>.<seconds>
+     */
+    public static String tpWarmup(String command, int seconds) {
+        return TP_WARMUP_PREFIX + command + "." + seconds;
+    }
+    
+    /**
+     * Get home warmup permission for a specific duration.
+     * @param seconds Warmup in seconds
+     * @return eliteessentials.command.home.warmup.<seconds>
+     */
+    public static String homeWarmup(int seconds) {
+        return HOME_WARMUP_PREFIX + seconds;
+    }
+    
+    /**
+     * Get spawn warmup permission for a specific duration.
+     * @param seconds Warmup in seconds
+     * @return eliteessentials.command.spawn.warmup.<seconds>
+     */
+    public static String spawnWarmup(int seconds) {
+        return SPAWN_WARMUP_PREFIX + seconds;
+    }
+    
+    /**
+     * Get warp warmup permission for a specific duration.
+     * @param seconds Warmup in seconds
+     * @return eliteessentials.command.warp.warmup.<seconds>
+     */
+    public static String warpWarmup(int seconds) {
+        return WARP_WARMUP_PREFIX + seconds;
     }
 
     // ==================== LEGACY COMPATIBILITY ====================

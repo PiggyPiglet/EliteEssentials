@@ -86,6 +86,9 @@ public class ChatListener {
                 .replace("{player}", playerName)
                 .replace("{displayname}", playerName);
         
+        // Replace LuckPerms placeholders if available
+        formattedMessage = replaceLuckPermsPlaceholders(sender, formattedMessage);
+        
         // Check if PAPI is available and enabled
         boolean isPapiAvailable = PAPIIntegration.available() && configManager.getConfig().chatFormat.placeholderapi;
 
@@ -285,5 +288,76 @@ public class ChatListener {
             }
         }
         return 0;
+    }
+    
+    /**
+     * Replace LuckPerms placeholders in the format string.
+     * Supported placeholders:
+     * - %luckperms_prefix% - Player's prefix from LuckPerms
+     * - %luckperms_suffix% - Player's suffix from LuckPerms
+     * - %luckperms_primary_group% - Player's primary group
+     * - {prefix} - Alias for %luckperms_prefix%
+     * - {suffix} - Alias for %luckperms_suffix%
+     * - {group} - Alias for %luckperms_primary_group%
+     * 
+     * @param player The player to get data for
+     * @param format The format string with placeholders
+     * @return The format string with placeholders replaced
+     */
+    private String replaceLuckPermsPlaceholders(PlayerRef player, String format) {
+        // Only process if LuckPerms is available and format contains placeholders
+        if (!LuckPermsIntegration.isAvailable()) {
+            // Remove placeholders if LP not available
+            return format
+                    .replace("%luckperms_prefix%", "")
+                    .replace("%luckperms_suffix%", "")
+                    .replace("%luckperms_primary_group%", "")
+                    .replace("{prefix}", "")
+                    .replace("{suffix}", "")
+                    .replace("{group}", "");
+        }
+        
+        java.util.UUID playerId = player.getUuid();
+        
+        // Check if any LP placeholders exist before fetching data
+        boolean hasPrefix = format.contains("%luckperms_prefix%") || format.contains("{prefix}");
+        boolean hasSuffix = format.contains("%luckperms_suffix%") || format.contains("{suffix}");
+        boolean hasGroup = format.contains("%luckperms_primary_group%") || format.contains("{group}");
+        
+        // Only fetch what we need
+        if (hasPrefix) {
+            String prefix = LuckPermsIntegration.getPrefix(playerId);
+            format = format
+                    .replace("%luckperms_prefix%", prefix)
+                    .replace("{prefix}", prefix);
+            
+            if (configManager.isDebugEnabled()) {
+                logger.info("Player " + player.getUsername() + " prefix: '" + prefix + "'");
+            }
+        }
+        
+        if (hasSuffix) {
+            String suffix = LuckPermsIntegration.getSuffix(playerId);
+            format = format
+                    .replace("%luckperms_suffix%", suffix)
+                    .replace("{suffix}", suffix);
+            
+            if (configManager.isDebugEnabled()) {
+                logger.info("Player " + player.getUsername() + " suffix: '" + suffix + "'");
+            }
+        }
+        
+        if (hasGroup) {
+            String group = LuckPermsIntegration.getPrimaryGroupDisplay(playerId);
+            format = format
+                    .replace("%luckperms_primary_group%", group)
+                    .replace("{group}", group);
+            
+            if (configManager.isDebugEnabled()) {
+                logger.info("Player " + player.getUsername() + " primary group: '" + group + "'");
+            }
+        }
+        
+        return format;
     }
 }

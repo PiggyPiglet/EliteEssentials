@@ -254,6 +254,9 @@ public class LuckPermsIntegration {
         perms.add(Permissions.tpBypassWarmup("tpahere"));
         // Note: Custom cooldown values (eliteessentials.command.tp.cooldown.<cmd>.<seconds>) 
         // are dynamically read from LuckPerms - no predefined values needed
+        // Note: Custom warmup values (eliteessentials.command.tp.warmup.<cmd>.<seconds>,
+        // eliteessentials.command.home.warmup.<seconds>, eliteessentials.command.spawn.warmup.<seconds>,
+        // eliteessentials.command.warp.warmup.<seconds>) are dynamically read from LuckPerms
         
         // Warp commands
         perms.add(Permissions.WARP);
@@ -1239,5 +1242,91 @@ public class LuckPermsIntegration {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+    
+    // ==================== PREFIX/SUFFIX METHODS ====================
+    
+    /**
+     * Get the player's prefix from LuckPerms.
+     * This returns the highest priority prefix assigned to the player (directly or via groups).
+     * Set via: /lp user <player> meta setprefix <priority> <prefix>
+     * Or on groups: /lp group <group> meta setprefix <priority> <prefix>
+     * 
+     * @param playerId Player UUID
+     * @return The prefix string, or empty string if not set
+     */
+    public static String getPrefix(java.util.UUID playerId) {
+        try {
+            Object[] lpObjects = getLuckPermsObjects(playerId);
+            if (lpObjects == null) {
+                return "";
+            }
+            
+            Object user = lpObjects[2];
+            
+            // Get CachedData -> MetaData
+            Method getCachedDataMethod = user.getClass().getMethod("getCachedData");
+            Object cachedData = getCachedDataMethod.invoke(user);
+            
+            Method getMetaDataMethod = cachedData.getClass().getMethod("getMetaData");
+            Object metaData = getMetaDataMethod.invoke(cachedData);
+            
+            // Get prefix - this returns the highest priority prefix
+            Method getPrefixMethod = metaData.getClass().getMethod("getPrefix");
+            String prefix = (String) getPrefixMethod.invoke(metaData);
+            
+            return prefix != null ? prefix : "";
+            
+        } catch (Exception e) {
+            return "";
+        }
+    }
+    
+    /**
+     * Get the player's suffix from LuckPerms.
+     * This returns the highest priority suffix assigned to the player (directly or via groups).
+     * Set via: /lp user <player> meta setsuffix <priority> <suffix>
+     * Or on groups: /lp group <group> meta setsuffix <priority> <suffix>
+     * 
+     * @param playerId Player UUID
+     * @return The suffix string, or empty string if not set
+     */
+    public static String getSuffix(java.util.UUID playerId) {
+        try {
+            Object[] lpObjects = getLuckPermsObjects(playerId);
+            if (lpObjects == null) {
+                return "";
+            }
+            
+            Object user = lpObjects[2];
+            
+            // Get CachedData -> MetaData
+            Method getCachedDataMethod = user.getClass().getMethod("getCachedData");
+            Object cachedData = getCachedDataMethod.invoke(user);
+            
+            Method getMetaDataMethod = cachedData.getClass().getMethod("getMetaData");
+            Object metaData = getMetaDataMethod.invoke(cachedData);
+            
+            // Get suffix - this returns the highest priority suffix
+            Method getSuffixMethod = metaData.getClass().getMethod("getSuffix");
+            String suffix = (String) getSuffixMethod.invoke(metaData);
+            
+            return suffix != null ? suffix : "";
+            
+        } catch (Exception e) {
+            return "";
+        }
+    }
+    
+    /**
+     * Get the player's primary group display name from LuckPerms.
+     * This is the primary group the player belongs to.
+     * 
+     * @param playerId Player UUID
+     * @return The primary group name, or empty string if not found
+     */
+    public static String getPrimaryGroupDisplay(java.util.UUID playerId) {
+        String group = getPrimaryGroup(playerId);
+        return group != null ? group : "";
     }
 }

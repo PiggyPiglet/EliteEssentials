@@ -203,11 +203,13 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
                         }
                         // Fall through to other methods
                     } else {
-                        // "You were killed by Skeleton Fighter!" → "PlayerName was killed by Skeleton Fighter!"
-                        String thirdPerson = ansiMessage
-                                .replace("You were", playerName + " was")
-                                .replace("You ", playerName + " ");
-                        return thirdPerson;
+                        // Try to extract killer name from Hytale's message and use our configured format
+                        String killerName = extractKillerFromHytaleMessage(ansiMessage);
+                        if (killerName != null) {
+                            return configManager.getMessage("deathByEntity",
+                                    "player", playerName, "killer", killerName);
+                        }
+                        // Fall through to other methods if we couldn't extract killer
                     }
                 }
             }
@@ -349,6 +351,32 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
         if (matcher.find()) {
             String rawName = matcher.group(1);
             return formatNpcName(rawName);
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract killer name from Hytale's death message.
+     * Handles patterns like: "You were killed by Skeleton Fighter!"
+     */
+    private String extractKillerFromHytaleMessage(String message) {
+        if (message == null) return null;
+
+        // Pattern: "You were killed by <killer>!" or "You were killed by <killer>"
+        Pattern killedByPattern = Pattern.compile("(?:You were killed by |killed by )([^!.]+)[!.]?", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = killedByPattern.matcher(message);
+
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+
+        // Pattern: "You were slain by <killer>"
+        Pattern slainByPattern = Pattern.compile("(?:You were slain by |slain by )([^!.]+)[!.]?", Pattern.CASE_INSENSITIVE);
+        matcher = slainByPattern.matcher(message);
+
+        if (matcher.find()) {
+            return matcher.group(1).trim();
         }
 
         return null;

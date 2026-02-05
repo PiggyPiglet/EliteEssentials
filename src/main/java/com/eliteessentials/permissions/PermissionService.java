@@ -509,6 +509,66 @@ public class PermissionService {
         return defaultCooldown;
     }
 
+    // ==================== TP COMMAND WARMUP ====================
+
+    /**
+     * Get the warmup for a teleport command based on permissions.
+     * Supports: rtp, tpa, tpahere, back, home, spawn, warp
+     * 
+     * Priority:
+     * 1. Bypass permission (returns 0)
+     * 2. LuckPerms permission-based warmup (any value via eliteessentials.command.tp.warmup.<cmd>.<seconds>)
+     * 3. Config default
+     * 
+     * Note: Custom warmup values require LuckPerms. Without LuckPerms, only config default is used.
+     * 
+     * @param playerId Player UUID
+     * @param commandName Command name (rtp, tpa, tpahere, back, home, spawn, warp)
+     * @param defaultWarmup Default warmup from config
+     * @return Effective warmup in seconds
+     */
+    public int getTpCommandWarmup(UUID playerId, String commandName, int defaultWarmup) {
+        // Check for bypass permission first (command-specific)
+        if (hasPermission(playerId, Permissions.tpBypassWarmup(commandName))) {
+            return 0;
+        }
+        
+        // Also check global TP bypass
+        if (hasPermission(playerId, Permissions.TP_BYPASS_WARMUP)) {
+            return 0;
+        }
+        
+        // Try to get custom warmup from LuckPerms based on command type
+        if (LuckPermsIntegration.isAvailable()) {
+            String warmupPrefix;
+            
+            // Route to appropriate warmup prefix based on command
+            switch (commandName.toLowerCase()) {
+                case "home":
+                    warmupPrefix = Permissions.HOME_WARMUP_PREFIX;
+                    break;
+                case "spawn":
+                    warmupPrefix = Permissions.SPAWN_WARMUP_PREFIX;
+                    break;
+                case "warp":
+                    warmupPrefix = Permissions.WARP_WARMUP_PREFIX;
+                    break;
+                default:
+                    // TP commands (rtp, back, tpa, tpahere, top)
+                    warmupPrefix = Permissions.TP_WARMUP_PREFIX + commandName + ".";
+                    break;
+            }
+            
+            int lpWarmup = LuckPermsIntegration.getInheritedPermissionValue(playerId, warmupPrefix);
+            if (lpWarmup >= 0) {
+                return lpWarmup;
+            }
+        }
+        
+        // No specific warmup permission found, return config default
+        return defaultWarmup;
+    }
+
     // ==================== COMMAND COST ====================
 
     /**

@@ -8,6 +8,7 @@ import com.eliteessentials.util.MessageFormatter;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -120,6 +121,8 @@ public class GroupChatService {
         groupChats.add(GroupChat.vipGroup());
         // Permission-based chat (requires eliteessentials.chat.trade)
         groupChats.add(GroupChat.tradeChat());
+        // Range-limited local chat (requires eliteessentials.chat.local, 50 block range)
+        groupChats.add(GroupChat.localChat());
         logger.info("Created default chat channel configuration.");
     }
     
@@ -212,6 +215,7 @@ public class GroupChatService {
     
     /**
      * Broadcast a message to all players who have access to a specific chat.
+     * If the chat has a range limit, only players within that range will receive the message.
      * 
      * @param groupChat The chat channel configuration
      * @param sender The player sending the message
@@ -230,6 +234,19 @@ public class GroupChatService {
         
         Message formattedMessage = MessageFormatter.format(format);
         
+        // Get sender position if range-limited
+        Vector3d senderPos = null;
+        String senderWorldName = null;
+        if (groupChat.hasRangeLimit()) {
+            try {
+                senderPos = sender.getTransform().getPosition();
+            } catch (Exception e) {
+                if (configManager.isDebugEnabled()) {
+                    logger.info("Failed to get sender position: " + e.getMessage());
+                }
+            }
+        }
+        
         // Find all players with access to this chat
         List<PlayerRef> recipients = new ArrayList<>();
         Universe universe = Universe.get();
@@ -237,12 +254,29 @@ public class GroupChatService {
         if (universe != null) {
             for (Map.Entry<String, World> entry : universe.getWorlds().entrySet()) {
                 World world = entry.getValue();
+                String worldName = world.getName();
                 Collection<PlayerRef> players = world.getPlayerRefs();
+                
+                // Track sender's world when we find them
+                if (groupChat.hasRangeLimit() && senderWorldName == null && players != null) {
+                    for (PlayerRef p : players) {
+                        if (p != null && p.getUuid().equals(sender.getUuid())) {
+                            senderWorldName = worldName;
+                            break;
+                        }
+                    }
+                }
                 
                 if (players != null) {
                     for (PlayerRef player : players) {
                         if (player != null && player.isValid()) {
                             if (playerHasAccess(player.getUuid(), groupChat)) {
+                                // Check range if applicable
+                                if (groupChat.hasRangeLimit() && senderPos != null && senderWorldName != null) {
+                                    if (!isPlayerInRange(player, worldName, senderWorldName, senderPos, groupChat.getRange())) {
+                                        continue;
+                                    }
+                                }
                                 recipients.add(player);
                             }
                         }
@@ -257,9 +291,39 @@ public class GroupChatService {
         }
         
         if (configManager.isDebugEnabled()) {
-            logger.info("Chat [" + groupChat.getGroupName() + "] from " + 
+            String rangeInfo = groupChat.hasRangeLimit() ? " (range: " + groupChat.getRange() + " blocks)" : "";
+            logger.info("Chat [" + groupChat.getGroupName() + "]" + rangeInfo + " from " + 
                        sender.getUsername() + " sent to " + recipients.size() + " players.");
         }
+    }
+    
+    /**
+     * Check if a player is within range of the sender.
+     */
+    private boolean isPlayerInRange(PlayerRef player, String playerWorldName, String senderWorldName, 
+                                    Vector3d senderPos, int range) {
+        // Must be in same world
+        if (!playerWorldName.equals(senderWorldName)) {
+            return false;
+        }
+        
+        try {
+            Vector3d playerPos = player.getTransform().getPosition();
+            double distance = calculateDistance(senderPos, playerPos);
+            return distance <= range;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Calculate 3D distance between two positions.
+     */
+    private double calculateDistance(Vector3d pos1, Vector3d pos2) {
+        double dx = pos1.x - pos2.x;
+        double dy = pos1.y - pos2.y;
+        double dz = pos1.z - pos2.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
     
     /**

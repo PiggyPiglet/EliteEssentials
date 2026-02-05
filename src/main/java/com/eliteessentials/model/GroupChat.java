@@ -27,6 +27,15 @@ public class GroupChat {
      */
     private Boolean requiresGroup;
     
+    /**
+     * Range in blocks for proximity-based chat.
+     * null or 0 = unlimited range (global chat)
+     * positive value = only players within this many blocks can see messages
+     * 
+     * Useful for RP servers with local/say chat channels.
+     */
+    private Integer range;
+    
     public GroupChat() {
         this.enabled = true;
         // Don't set requiresGroup here - leave it null so we can detect missing field during migration
@@ -48,6 +57,16 @@ public class GroupChat {
         this.color = color;
         this.enabled = true;
         this.requiresGroup = requiresGroup;
+    }
+    
+    public GroupChat(String groupName, String displayName, String prefix, String color, boolean requiresGroup, Integer range) {
+        this.groupName = groupName;
+        this.displayName = displayName;
+        this.prefix = prefix;
+        this.color = color;
+        this.enabled = true;
+        this.requiresGroup = requiresGroup;
+        this.range = range;
     }
     
     public String getGroupName() {
@@ -114,6 +133,29 @@ public class GroupChat {
     }
     
     /**
+     * Get the range in blocks for proximity-based chat.
+     * @return range in blocks, or null/0 for unlimited
+     */
+    public Integer getRange() {
+        return range;
+    }
+    
+    /**
+     * Set the range in blocks for proximity-based chat.
+     * @param range blocks, or null/0 for unlimited
+     */
+    public void setRange(Integer range) {
+        this.range = range;
+    }
+    
+    /**
+     * Check if this chat has a range limit (proximity-based).
+     */
+    public boolean hasRangeLimit() {
+        return range != null && range > 0;
+    }
+    
+    /**
      * Creates a default admin group chat.
      */
     public static GroupChat adminGroup() {
@@ -147,5 +189,14 @@ public class GroupChat {
      */
     public static GroupChat tradeChat() {
         return new GroupChat("trade", "Trade Chat", "[TRADE]", "#f0c674", false);
+    }
+    
+    /**
+     * Creates a default local/say chat (permission-based, range-limited).
+     * Players need eliteessentials.chat.local to use this.
+     * Only players within 50 blocks can see messages.
+     */
+    public static GroupChat localChat() {
+        return new GroupChat("local", "Local Chat", "[LOCAL]", "#8b949e", false, 50);
     }
 }

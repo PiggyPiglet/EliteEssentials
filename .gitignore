@@ -15,6 +15,7 @@ bin/
 .classpath
 .project
 api/
+dev/
 # OS
 .DS_Store
 Thumbs.db

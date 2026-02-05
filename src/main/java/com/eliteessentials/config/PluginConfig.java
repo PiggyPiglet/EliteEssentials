@@ -53,6 +53,7 @@ public class PluginConfig {
     public RulesConfig rules = new RulesConfig();
     public JoinMsgConfig joinMsg = new JoinMsgConfig();
     public BroadcastConfig broadcast = new BroadcastConfig();
+    public ClearChatConfig clearChat = new ClearChatConfig();
     public ClearInvConfig clearInv = new ClearInvConfig();
     public ListConfig list = new ListConfig();
     public ChatFormatConfig chatFormat = new ChatFormatConfig();
@@ -279,6 +280,9 @@ public class PluginConfig {
         
         // ==================== BROADCAST ====================
         messages.put("broadcast", "&6&l[BROADCAST] &r&e{message}");
+        
+        // ==================== CLEAR CHAT ====================
+        messages.put("chatCleared", "&aChat has been cleared by an administrator.");
         
         // ==================== CLEAR INVENTORY ====================
         messages.put("clearInvSuccess", "&aCleared &e{count} &aitems from your inventory.");
@@ -685,6 +689,12 @@ public class PluginConfig {
         
         /** Percentage of players that must sleep to skip night (0-100) */
         public int sleepPercentage = 50;
+        
+        /** Hour when night starts and players can begin sleeping (0-23.99, default 19.5 = 7:30 PM) */
+        public double nightStartHour = 19.5;
+        
+        /** Hour when morning arrives and players wake up (0-23.99, default 5.5 = 5:30 AM) */
+        public double morningHour = 5.5;
     }
 
     // ==================== DEATH MESSAGES ====================
@@ -847,6 +857,18 @@ public class PluginConfig {
         
         /** Disable ALL damage in spawn area (fall damage, fire, drowning, etc.) */
         public boolean disableAllDamage = false;
+        
+        /** Disable block interactions (chests, doors, buttons, etc.) in spawn area */
+        public boolean disableInteractions = false;
+        
+        /** 
+         * Disable item pickups in spawn area.
+         * NOTE: May not work properly due to Hytale API limitations.
+         */
+        public boolean disableItemPickup = false;
+        
+        /** Disable item drops in spawn area */
+        public boolean disableItemDrop = false;
     }
     
     // ==================== MOTD (Message of the Day) ====================
@@ -905,6 +927,13 @@ public class PluginConfig {
         public boolean enabled = true;
     }
     
+    // ==================== CLEAR CHAT ====================
+    
+    public static class ClearChatConfig {
+        /** Enable/disable the /clearchat command */
+        public boolean enabled = true;
+    }
+    
     // ==================== CLEAR INVENTORY ====================
     
     public static class ClearInvConfig {
@@ -951,11 +980,25 @@ public class PluginConfig {
         
         /** 
          * Chat format per group.
-         * Placeholders: {player}, {displayname}, {message}, {group}
-         * Color codes: &0-f, &l (bold), &o (italic), &r (reset)
+         * 
+         * Basic Placeholders:
+         * - {player} - Player's username
+         * - {displayname} - Player's display name
+         * - {message} - The chat message
+         * 
+         * LuckPerms Placeholders (requires LuckPerms):
+         * - {prefix} or %luckperms_prefix% - Player's LuckPerms prefix
+         * - {suffix} or %luckperms_suffix% - Player's LuckPerms suffix
+         * - {group} or %luckperms_primary_group% - Player's primary group
+         * 
+         * Color codes: &0-f, &l (bold), &r (reset)
+         * Hex colors: &#RRGGBB (e.g., &#FF5555)
          * 
          * Groups are checked in priority order (highest priority first).
          * Works with both LuckPerms groups and simple permission groups.
+         * 
+         * Example with LuckPerms prefix/suffix:
+         * "Admin": "{prefix}&c{player}{suffix}&r: {message}"
          */
         public Map<String, String> groupFormats = createDefaultGroupFormats();
         

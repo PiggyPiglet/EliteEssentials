@@ -70,12 +70,19 @@ public class HytaleChatsCommand extends AbstractPlayerCommand {
                 colorCode = "&" + colorCode;
             }
             
+            // Add range info if applicable
+            String rangeInfo = "";
+            if (chat.hasRangeLimit()) {
+                rangeInfo = " &7(" + chat.getRange() + " blocks)";
+            }
+            
             String entry = configManager.getMessage("chatsEntry",
                 "color", colorCode != null ? colorCode : "&f",
                 "name", chat.getGroupName(),
                 "displayName", chat.getDisplayName(),
                 "prefix", chat.getPrefix(),
-                "type", type);
+                "type", type,
+                "range", rangeInfo);
             ctx.sendMessage(MessageFormatter.format(entry));
         }
         

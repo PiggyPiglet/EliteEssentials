@@ -625,12 +625,24 @@ public class HytaleRtpCommand extends CommandBase {
         if (invulnerabilitySeconds > 0) {
             store.putComponent(ref, Invulnerable.getComponentType(), Invulnerable.INSTANCE);
             
+            // Capture playerId for fresh ref lookup - avoids stale ref after rapid teleports
+            final UUID targetPlayerId = playerId;
             scheduler.schedule(() -> {
                 world.execute(() -> {
                     try {
-                        store.removeComponent(ref, Invulnerable.getComponentType());
+                        // Get fresh player ref - original ref may be stale after teleport
+                        PlayerRef freshPlayer = findPlayerByUuid(targetPlayerId);
+                        if (freshPlayer == null) return;
+                        
+                        Ref<EntityStore> freshRef = freshPlayer.getReference();
+                        if (freshRef == null || !freshRef.isValid()) return;
+                        
+                        Store<EntityStore> freshStore = freshRef.getStore();
+                        if (freshStore == null) return;
+                        
+                        freshStore.removeComponent(freshRef, Invulnerable.getComponentType());
                     } catch (Exception e) {
-                        // Ignore
+                        // Player may have logged out or changed worlds - safe to ignore
                     }
                 });
             }, invulnerabilitySeconds, TimeUnit.SECONDS);

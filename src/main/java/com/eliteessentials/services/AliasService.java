@@ -119,7 +119,7 @@ public class AliasService {
                     case "warp": doWarp(ctx, store, ref, player, world, args, silent); break;
                     case "spawn": doSpawn(ctx, store, ref, player, world, silent); break;
                     case "home": doHome(ctx, store, ref, player, world, args, silent); break;
-                    case "homes": doHomes(ctx, player); break;
+                    case "homes": doHomes(ctx, store, ref, player, world); break;
                     case "heal": doHeal(ctx, store, ref, player, silent); break;
                     case "god": doGod(ctx, store, ref, player, silent); break;
                     case "fly": doFly(ctx, store, ref, player, silent); break;
@@ -351,7 +351,7 @@ public class AliasService {
             }
         }
 
-        private void doHomes(CommandContext ctx, PlayerRef player) {
+        private void doHomes(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world) {
             var configManager = EliteEssentials.getInstance().getConfigManager();
             var config = configManager.getConfig();
             UUID playerId = player.getUuid();
@@ -364,10 +364,20 @@ public class AliasService {
             var homeService = EliteEssentials.getInstance().getHomeService();
             var homes = homeService.getHomes(playerId);
             if (homes.isEmpty()) {
-                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homesEmpty"), "#FFAA00"));
+                ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("homeNoHomes"), "#FFAA00"));
                 return;
             }
-            ctx.sendMessage(Message.raw("Your homes: " + String.join(", ", homes.keySet())).color("#55FF55"));
+            
+            // Open the home selection GUI (same as /homes command)
+            Player playerEntity = store.getComponent(ref, Player.getComponentType());
+            if (playerEntity == null) {
+                ctx.sendMessage(MessageFormatter.formatWithFallback("&cCould not open homes menu.", "#FF5555"));
+                return;
+            }
+            
+            var backService = EliteEssentials.getInstance().getBackService();
+            com.eliteessentials.gui.HomeSelectionPage page = new com.eliteessentials.gui.HomeSelectionPage(player, homeService, backService, configManager, world);
+            playerEntity.getPageManager().openCustomPage(ref, store, page);
         }
 
         private void doKit(CommandContext ctx, Store<EntityStore> store, Ref<EntityStore> ref, PlayerRef player, World world, String args) {

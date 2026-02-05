@@ -135,7 +135,10 @@
     "minY": -1,
     "maxY": -1,
     "disablePvp": true,
-    "disableAllDamage": false
+    "disableAllDamage": false,
+    "disableInteractions": false,
+    "disableItemPickup": false,
+    "disableItemDrop": false
   },
   
   "motd": {

@@ -85,17 +85,27 @@ All 60+ player-facing messages are configurable in `messages.json`. Translate yo
   - Fully customizable content
 - **`/broadcast <message>`** - Broadcast a message to all players (Admin, alias: /bc)
   - Supports color codes for formatted announcements
+- **`/clearchat`** - Clear chat for all players (Admin, alias: /cc)
+  - Displays configurable message after clearing
 - **`/list`** - Show all online players (aliases: /online, /who)
   - Displays player count and sorted list of names
   - Helpful for finding exact player names for commands
 - **Group-Based Chat Formatting** - Customize chat appearance by player group
   - Works with LuckPerms groups and simple permissions
   - Priority-based group selection (highest priority wins)
-  - Color codes and placeholders: `{player}`, `{displayname}`, `{message}`
+  - Color codes and placeholders: `{player}`, `{displayname}`, `{message}`, `{prefix}`, `{suffix}`, `{group}`
   - **Hex color support**: Use `&#RRGGBB` format for precise colors (e.g., `&#FF5555`)
+  - **LuckPerms prefix/suffix support**: Use `{prefix}` and `{suffix}` to display LuckPerms meta
   - Create gradients with per-character hex colors
   - Fully configurable per group in `config.json`
   - Easy to add custom groups
+- **PlaceholderAPI Integration** - Full support for cross-plugin placeholders
+  - Use placeholders from other plugins in chat format (e.g., `%vault_eco_balance%`)
+  - EliteEssentials provides its own placeholders for other plugins to use
+  - Config option: `chatFormat.placeholderapi` to toggle PAPI processing
+- **Range-Based Group Chat** - Create proximity-based chat channels
+  - Configure `range` field in group chats for local/proximity chat
+  - Perfect for RP servers where only nearby players should hear you
 - **Join Messages** - Automatic messages when players join
   - First join messages broadcast to everyone
   - Fully customizable in config
@@ -103,6 +113,7 @@ All 60+ player-facing messages are configurable in `messages.json`. Translate yo
 
 ### Sleep Percentage (Admin)
 - **`/sleeppercent <0-100>`** - Set percentage of players needed to skip the night
+- **Configurable sleep times** - Control when players can sleep (`nightStartHour`) and wake up (`morningHour`)
 - Progress messages shown to all players
 - Automatically skips to morning when threshold reached
 
@@ -187,6 +198,7 @@ Config file is automatically created on first server start with sensible default
 | `/rules` | Display server rules | Everyone |
 | `/broadcast <message>` | Broadcast to all players | Admin |
 | `/clearinv` | Clear all inventory items | Admin |
+| `/clearchat` | Clear chat for all players | Admin |
 | `/setwarp <name> [perm]` | Create warp | Admin |
 | `/delwarp <name>` | Delete warp | Admin |
 | `/warpadmin` | Warp admin panel | Admin |
@@ -215,10 +227,10 @@ Full granular permissions following `eliteessentials.command.<category>.<action>
 
 | Category | Example Permissions |
 |----------|---------------------|
-| Home | `command.home.home`, `command.home.sethome`, `command.home.limit.5` |
-| Teleport | `command.tp.tpa`, `command.tp.back`, `command.tp.back.ondeath` |
-| Warp | `command.warp.use`, `command.warp.<warpname>` |
-| Spawn | `command.spawn.use`, `command.spawn.protection.bypass` |
+| Home | `command.home.home`, `command.home.sethome`, `command.home.limit.5`, `command.home.warmup.0` |
+| Teleport | `command.tp.tpa`, `command.tp.back`, `command.tp.back.ondeath`, `command.tp.warmup.rtp.5` |
+| Warp | `command.warp.use`, `command.warp.<warpname>`, `command.warp.warmup.0` |
+| Spawn | `command.spawn.use`, `command.spawn.protection.bypass`, `command.spawn.warmup.0` |
 | Kit | `command.kit.use`, `command.kit.<kitname>`, `command.kit.bypass.cooldown` |
 | Bypass | `command.home.bypass.cooldown`, `command.tp.bypass.warmup`, `bypass.cost` |
 

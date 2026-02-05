@@ -9,9 +9,13 @@ import com.eliteessentials.util.CommandPermissionUtil;
 import com.eliteessentials.util.MessageFormatter;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.MovementStates;
+import com.hypixel.hytale.protocol.SavedMovementStates;
+import com.hypixel.hytale.protocol.packets.player.SetMovementStates;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -93,6 +97,16 @@ public class HytaleFlyCommand extends AbstractPlayerCommand {
                 ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flyEnabled"), "#55FF55"));
             } else {
                 ctx.sendMessage(MessageFormatter.formatWithFallback(configManager.getMessage("flyDisabled"), "#FFAA00"));
+                
+                // When disabling flight, also stop the player from flying if they're currently in the air
+                MovementStatesComponent movementStatesComponent = store.getComponent(ref, MovementStatesComponent.getComponentType());
+                if (movementStatesComponent != null) {
+                    MovementStates movementStates = movementStatesComponent.getMovementStates();
+                    if (movementStates.flying) {
+                        movementStates.flying = false;
+                        player.getPacketHandler().writeNoCache(new SetMovementStates(new SavedMovementStates(false)));
+                    }
+                }
             }
             
             // Set cooldown after successful toggle

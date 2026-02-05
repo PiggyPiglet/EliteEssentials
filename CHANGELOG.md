@@ -2,6 +2,139 @@
 
 All notable changes to EliteEssentials will be documented in this file.
 
+## [1.1.7] - 2026-02-04
+
+Special thanks to PiggyPiglet for PlaceholderAPI integration and L8-Alphine for fixes on respawn after death.
+
+### Added
+
+**Clear Chat Command** - Admin command to clear chat for all players
+* `/clearchat` (alias: `/cc`) - Clears chat
+* Displays a configurable message after clearing: "Chat has been cleared by an administrator."
+* Permission: `eliteessentials.command.misc.clearchat` (Admin only)
+* Config option: `clearChat.enabled` (default: true)
+
+**PlaceholderAPI Integration** - Full support for cross-plugin placeholders
+* Optional soft dependency on HelpChat's PlaceholderAPI for Hytale
+* Use placeholders from other plugins in your chat format (e.g., `%vault_eco_balance%`, `%othermod_stat%`)
+* Placeholders work in chat messages, join messages, and broadcasts
+* Config option: `chatFormat.placeholderapi` (default: true) - toggle PAPI processing
+* Declared in `manifest.json` as optional dependency - works with or without PAPI installed
+
+**EliteEssentials PAPI Expansion** - Placeholders other plugins can use:
+* Economy: `%eliteessentials_balance%`, `%eliteessentials_economy_enabled%`, `%eliteessentials_currency_name%`
+* Status: `%eliteessentials_god%`, `%eliteessentials_vanished%`
+* Homes: `%eliteessentials_homes_num%`, `%eliteessentials_homes_max%`, `%eliteessentials_homes_names%`
+* Kits: `%eliteessentials_all_kits_num%`, `%eliteessentials_allowed_kits_names%`, `%eliteessentials_kit_<id>_cooldown%`
+* Warps: `%eliteessentials_all_warps_num%`, `%eliteessentials_allowed_warps_names%`, `%eliteessentials_warp_<name>_coords%`
+* Relational placeholders supported for distance-based or player-to-player data
+
+**LuckPerms Prefix/Suffix Placeholders** - Display LuckPerms prefixes and suffixes in chat
+* New placeholders for chat format: `{prefix}`, `{suffix}`, `{group}`
+* Also supports PAPI-style: `%luckperms_prefix%`, `%luckperms_suffix%`, `%luckperms_primary_group%`
+* Prefixes/suffixes are pulled directly from LuckPerms meta data
+* Manage all your prefixes in LuckPerms, EliteEssentials handles the display
+* Works independently - no PlaceholderAPI required for LuckPerms prefix/suffix
+
+Example chat format:
+```json
+"groupFormats": {
+  "Admin": "{prefix}{player}{suffix}&r: {message}"
+}
+```
+
+Setting prefixes in LuckPerms:
+```
+/lp group admin meta setprefix 100 "&c[Admin] "
+/lp group vip meta setsuffix 50 " &6[VIP]"
+```
+
+**Configurable Sleep Times** - Control when players can sleep and when they wake up
+* New config option: `nightStartHour` (default: 19.5 = 7:30 PM) - when players can start sleeping
+* New config option: `morningHour` (default: 5.5 = 5:30 AM) - when players wake up
+* Supports decimal hours for minute granularity (e.g., 20.5 = 8:30 PM)
+* Allows servers to let players sleep earlier or later than Hytale's default
+* Note: The client-side "You may sleep starting at X" message is controlled by Hytale and cannot be changed
+
+**Range-Based Group Chat** - Create proximity-based chat channels for RP servers
+* New `range` field for group chats - only players within X blocks can see messages
+* Perfect for local/say chat channels where only nearby players should hear you
+* Default "local" chat added with 50 block range (requires `eliteessentials.chat.local` permission)
+* `/chats` command now shows range info for range-limited channels
+* Range is calculated in 3D (includes vertical distance)
+* Players must be in the same world to receive range-limited messages
+* `range: 0` = global chat (no distance limit)
+* `range: 50` = only players within 50 blocks see the message
+
+Configuration example in `groupchat.json`:
+```json
+{
+  "groupName": "local",
+  "displayName": "Local Chat",
+  "prefix": "[LOCAL]",
+  "color": "#8b949e",
+  "enabled": true,
+  "requiresGroup": false,
+  "range": 50
+}
+```
+
+**Permission-Based Warmups** - Set custom warmup times per group via LuckPerms
+* Works exactly like the existing cooldown permission system
+* Lowest value found wins (most favorable to player)
+* Supports all teleport commands: home, spawn, warp, rtp, back, tpa, tpahere
+
+New permission nodes:
+* `eliteessentials.command.home.warmup.<seconds>` - Custom /home warmup
+* `eliteessentials.command.spawn.warmup.<seconds>` - Custom /spawn warmup
+* `eliteessentials.command.warp.warmup.<seconds>` - Custom /warp warmup
+* `eliteessentials.command.tp.warmup.rtp.<seconds>` - Custom /rtp warmup
+* `eliteessentials.command.tp.warmup.back.<seconds>` - Custom /back warmup
+* `eliteessentials.command.tp.warmup.tpa.<seconds>` - Custom /tpa warmup
+* `eliteessentials.command.tp.warmup.tpahere.<seconds>` - Custom /tpahere warmup
+
+Example usage:
+```
+/lp group vip permission set eliteessentials.command.home.warmup.0 true    # Instant /home
+/lp group default permission set eliteessentials.command.tp.warmup.rtp.10 true  # 10s RTP warmup
+```
+
+### Fixed
+
+**Respawn System Overhaul** - Players now correctly respawn at spawn when they have no bed
+* Players without a bed/respawn point now properly teleport to `/setspawn` location after death
+* Respects `perWorld` setting: uses current world's spawn or `mainWorld` spawn as configured
+* Bed detection via `PlayerConfigData.getRespawnPoints()` - if player has ANY respawn point (bed/custom), vanilla respawn is used
+* If no respawn points exist, EliteEssentials teleports player to the configured spawn location
+* Cross-world respawn works correctly (e.g., die in explore world, respawn at main world spawn)
+* Delayed teleport (1 second) on death world's executor prevents conflicts with Hytale's respawn/ClientReady handshake
+* Fixes "ghost player" issues where players would appear disconnected or out of sync after death
+* Root cause: Immediate teleport during `DeathComponent` removal interfered with Hytale's internal respawn flow
+* Solution: Delay teleport and execute on proper world thread to avoid race conditions with client state synchronization
+
+**Spawn Protection Cross-World Bug** - Fixed spawn protection applying to wrong worlds
+* Spawn protection was checking coordinates against ALL world spawns instead of just the current world
+* If you set spawn at (100, 64, 100) in the default world, those same coordinates in other worlds (like skyblock_islands) would also be protected
+* Root cause: Protection systems were calling `isInProtectedArea()` without passing the world name, causing it to check against all spawns
+* Fix: All protection handlers now get the world name from the store and pass it to world-specific protection checks
+* Spawn protection now only applies in the world where the spawn was actually set
+
+**RTP Console Spam** - Fixed rapid `/rtp` commands causing continuous error spam in console
+* Using `/rtp` twice in quick succession would cause non-stop `NullPointerException` and `IndexOutOfBoundsException` errors
+* Root cause: Scheduled invulnerability removal callback captured stale entity refs that became invalid after teleportation
+* Fix: Callback now looks up fresh player reference by UUID instead of using captured stale ref
+* Errors no longer spam even when players rapidly use `/rtp`
+
+**Flight Toggle** - Fixed `/fly` not properly disabling flight mode when toggled off
+
+**Death Messages Not Using messages.json** - Death messages now honor custom messages from messages.json
+* Previously, when Hytale provided a death message (e.g., "You were killed by Skeleton Fighter!"), it was used directly with simple text replacement
+* Now the system extracts the killer name and uses the configured `deathByEntity` message format from messages.json
+* Server owners can now fully customize death messages like `{player} was slain by {killer}` or any other format
+* All death message types (entity, player, fall, fire, etc.) now consistently use messages.json
+
+---
+
 ## [1.1.6] - 2026-02-02
 
 ### Added

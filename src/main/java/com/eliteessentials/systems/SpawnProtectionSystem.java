@@ -7,17 +7,26 @@ import com.hypixel.hytale.component.ComponentRegistry;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.SystemGroup;
+import com.hypixel.hytale.component.dependency.Dependency;
+import com.hypixel.hytale.component.dependency.RootDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.EntityEventSystem;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.ecs.BreakBlockEvent;
 import com.hypixel.hytale.server.core.event.events.ecs.DamageBlockEvent;
+import com.hypixel.hytale.server.core.event.events.ecs.DropItemEvent;
+import com.hypixel.hytale.server.core.event.events.ecs.InteractivelyPickupItemEvent;
 import com.hypixel.hytale.server.core.event.events.ecs.PlaceBlockEvent;
+import com.hypixel.hytale.server.core.event.events.ecs.UseBlockEvent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * ECS systems for spawn protection.
@@ -27,6 +36,9 @@ public class SpawnProtectionSystem {
 
     private static final String PROTECTED_MSG = "This area is protected.";
     private static final String PVP_MSG = "PvP is disabled in spawn.";
+    private static final String INTERACTION_MSG = "Interactions are disabled in spawn.";
+    private static final String PICKUP_MSG = "Item pickups are disabled in spawn.";
+    private static final String DROP_MSG = "Item drops are disabled in spawn.";
     private static final String MSG_COLOR = "#FF5555";
 
     private final SpawnProtectionService protectionService;
@@ -43,6 +55,9 @@ public class SpawnProtectionSystem {
         registry.registerSystem(new PlaceBlockProtection(protectionService));
         registry.registerSystem(new DamageBlockProtection(protectionService));
         registry.registerSystem(new PvpProtection(protectionService));
+        registry.registerSystem(new InteractionProtection(protectionService));
+        registry.registerSystem(new ItemPickupProtection(protectionService));
+        registry.registerSystem(new ItemDropProtection(protectionService));
     }
 
     // ==================== BLOCK BREAK PROTECTION ====================
@@ -64,7 +79,10 @@ public class SpawnProtectionSystem {
         public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                           CommandBuffer<EntityStore> buffer, BreakBlockEvent event) {
             if (!service.isEnabled() || event.isCancelled()) return;
-            if (!service.isInProtectedArea(event.getTargetBlock())) return;
+            
+            // Get world name for per-world protection check
+            String worldName = getWorldName(store);
+            if (worldName == null || !service.isInProtectedArea(worldName, event.getTargetBlock())) return;
 
             PlayerRef player = chunk.getComponent(index, PlayerRef.getComponentType());
             if (player != null && service.canBypass(player.getUuid())) return;
@@ -95,7 +113,10 @@ public class SpawnProtectionSystem {
         public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                           CommandBuffer<EntityStore> buffer, PlaceBlockEvent event) {
             if (!service.isEnabled() || event.isCancelled()) return;
-            if (!service.isInProtectedArea(event.getTargetBlock())) return;
+            
+            // Get world name for per-world protection check
+            String worldName = getWorldName(store);
+            if (worldName == null || !service.isInProtectedArea(worldName, event.getTargetBlock())) return;
 
             PlayerRef player = chunk.getComponent(index, PlayerRef.getComponentType());
             if (player != null && service.canBypass(player.getUuid())) return;
@@ -126,7 +147,10 @@ public class SpawnProtectionSystem {
         public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                           CommandBuffer<EntityStore> buffer, DamageBlockEvent event) {
             if (!service.isEnabled() || event.isCancelled()) return;
-            if (!service.isInProtectedArea(event.getTargetBlock())) return;
+            
+            // Get world name for per-world protection check
+            String worldName = getWorldName(store);
+            if (worldName == null || !service.isInProtectedArea(worldName, event.getTargetBlock())) return;
 
             PlayerRef player = chunk.getComponent(index, PlayerRef.getComponentType());
             if (player != null && service.canBypass(player.getUuid())) return;
@@ -139,7 +163,6 @@ public class SpawnProtectionSystem {
     
     private static class PvpProtection extends DamageEventSystem {
         private final SpawnProtectionService service;
-        private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger("EliteEssentials");
 
         PvpProtection(SpawnProtectionService service) {
             super();
@@ -173,8 +196,12 @@ public class SpawnProtectionSystem {
             PlayerRef victim = chunk.getComponent(index, PlayerRef.getComponentType());
             if (victim == null) return;
 
-            // Check if victim is in protected area
-            if (!service.isInProtectedArea(victim.getTransform().getPosition())) {
+            // Get world name for per-world protection check
+            String worldName = getWorldName(store);
+            if (worldName == null) return;
+
+            // Check if victim is in protected area (world-specific)
+            if (!service.isInProtectedArea(worldName, victim.getTransform().getPosition())) {
                 return;
             }
             
@@ -210,5 +237,137 @@ public class SpawnProtectionSystem {
             event.setAmount(0);
             attacker.sendMessage(Message.raw(PVP_MSG).color(MSG_COLOR));
         }
+    }
+
+    // ==================== BLOCK INTERACTION PROTECTION ====================
+    
+    private static class InteractionProtection extends EntityEventSystem<EntityStore, UseBlockEvent.Pre> {
+        private final SpawnProtectionService service;
+
+        InteractionProtection(SpawnProtectionService service) {
+            super(UseBlockEvent.Pre.class);
+            this.service = service;
+        }
+
+        @Override
+        public Query<EntityStore> getQuery() {
+            return Query.any();
+        }
+
+        @Override
+        public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
+                          CommandBuffer<EntityStore> buffer, UseBlockEvent.Pre event) {
+            if (!service.isEnabled() || event.isCancelled()) return;
+            if (!service.isInteractionProtectionEnabled()) return;
+            
+            // Get world name for per-world protection check
+            String worldName = getWorldName(store);
+            if (worldName == null || !service.isInProtectedArea(worldName, event.getTargetBlock())) return;
+
+            PlayerRef player = chunk.getComponent(index, PlayerRef.getComponentType());
+            if (player != null && service.canBypass(player.getUuid())) return;
+
+            event.setCancelled(true);
+            if (player != null) {
+                player.sendMessage(Message.raw(INTERACTION_MSG).color(MSG_COLOR));
+            }
+        }
+    }
+
+    // ==================== ITEM PICKUP PROTECTION ====================
+    
+    /**
+     * NOTE: Item pickup cancellation may not work properly in current Hytale API.
+     * Uses RootDependency.first() to try to run before the pickup is processed.
+     */
+    private static class ItemPickupProtection extends EntityEventSystem<EntityStore, InteractivelyPickupItemEvent> {
+        private final SpawnProtectionService service;
+
+        ItemPickupProtection(SpawnProtectionService service) {
+            super(InteractivelyPickupItemEvent.class);
+            this.service = service;
+        }
+
+        @Override
+        public Query<EntityStore> getQuery() {
+            return PlayerRef.getComponentType();
+        }
+        
+        @Override
+        public Set<Dependency<EntityStore>> getDependencies() {
+            return Collections.singleton(RootDependency.first());
+        }
+
+        @Override
+        public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
+                          CommandBuffer<EntityStore> buffer, InteractivelyPickupItemEvent event) {
+            if (!service.isEnabled() || event.isCancelled()) return;
+            if (!service.isItemPickupProtectionEnabled()) return;
+
+            PlayerRef player = chunk.getComponent(index, PlayerRef.getComponentType());
+            if (player == null) return;
+            
+            // Get world name for per-world protection check
+            String worldName = getWorldName(store);
+            if (worldName == null || !service.isInProtectedArea(worldName, player.getTransform().getPosition())) return;
+            if (service.canBypass(player.getUuid())) return;
+
+            event.setCancelled(true);
+            player.sendMessage(Message.raw(PICKUP_MSG).color(MSG_COLOR));
+        }
+    }
+
+    // ==================== ITEM DROP PROTECTION ====================
+    
+    /**
+     * Uses PlayerRequest event which fires BEFORE the item is removed from inventory.
+     * This properly prevents the drop without losing the item.
+     */
+    private static class ItemDropProtection extends EntityEventSystem<EntityStore, DropItemEvent.PlayerRequest> {
+        private final SpawnProtectionService service;
+
+        ItemDropProtection(SpawnProtectionService service) {
+            super(DropItemEvent.PlayerRequest.class);
+            this.service = service;
+        }
+
+        @Override
+        public Query<EntityStore> getQuery() {
+            return Query.any();
+        }
+
+        @Override
+        public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
+                          CommandBuffer<EntityStore> buffer, DropItemEvent.PlayerRequest event) {
+            if (!service.isEnabled() || event.isCancelled()) return;
+            if (!service.isItemDropProtectionEnabled()) return;
+
+            PlayerRef player = chunk.getComponent(index, PlayerRef.getComponentType());
+            if (player == null) return;
+            
+            // Get world name for per-world protection check
+            String worldName = getWorldName(store);
+            if (worldName == null || !service.isInProtectedArea(worldName, player.getTransform().getPosition())) return;
+            if (service.canBypass(player.getUuid())) return;
+
+            event.setCancelled(true);
+            player.sendMessage(Message.raw(DROP_MSG).color(MSG_COLOR));
+        }
+    }
+    
+    // ==================== HELPER METHODS ====================
+    
+    /**
+     * Get the world name from the store's external data.
+     * Returns null if world cannot be determined.
+     */
+    private static String getWorldName(Store<EntityStore> store) {
+        EntityStore entityStore = store.getExternalData();
+        if (entityStore == null) return null;
+        
+        World world = entityStore.getWorld();
+        if (world == null) return null;
+        
+        return world.getName();
     }
 }
