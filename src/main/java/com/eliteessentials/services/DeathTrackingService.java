@@ -28,6 +28,10 @@ import java.util.logging.Logger;
  * 
  * All death locations are immediately persisted to JSON via BackService.
  */
+
+// NOTE: PlayerDeathSystem is the authoritative source of death locations.
+// This service is currently only used for diagnostics / last-known position helpers;
+// it does NOT call BackService automatically.
 public class DeathTrackingService {
 
     private static final Logger logger = Logger.getLogger("EliteEssentials");
@@ -135,7 +139,7 @@ public class DeathTrackingService {
     
     private void checkPlayer(UUID playerId, Universe universe) {
         if (playerId == null) return;
-        
+
         PlayerRef playerRef = universe.getPlayer(playerId);
         boolean isValid = playerRef != null && playerRef.isValid();
         
@@ -145,9 +149,11 @@ public class DeathTrackingService {
         // DETECTION 1: Player became invalid (death or disconnect)
         if (previouslyValid != null && previouslyValid && !isValid) {
             if (stablePos != null && !Boolean.TRUE.equals(deathLocationSaved.get(playerId))) {
-                logger.fine("[DeathTracking] Player " + playerId + " became INVALID. Saving death location: " + 
-                    String.format("%.1f, %.1f, %.1f", stablePos.getX(), stablePos.getY(), stablePos.getZ()));
-                backService.pushDeathLocation(playerId, stablePos);
+                if (configManager.isDebugEnabled()) {
+                    logger.fine("[DeathTracking] Player " + playerId + " became INVALID at approx: " +
+                            String.format("%.1f, %.1f, %.1f", stablePos.getX(), stablePos.getY(), stablePos.getZ()) +
+                            " (NOT saving as death location – PlayerDeathSystem handles that).");
+                }
                 deathLocationSaved.put(playerId, true);
             }
         }
@@ -163,33 +169,24 @@ public class DeathTrackingService {
                 // DETECTION 2: Large sudden teleport (respawn after death)
                 if (previousPos != null) {
                     double distance = calculateDistance(previousPos, newPos);
-                    
-                    // If player suddenly moved far, they likely respawned
+
                     if (distance > RESPAWN_DISTANCE_THRESHOLD) {
-                        // Only save if we haven't already saved for this death
                         if (!Boolean.TRUE.equals(deathLocationSaved.get(playerId))) {
-                            logger.fine("[DeathTracking] Detected RESPAWN for " + playerId + 
-                                       ": moved " + String.format("%.1f", distance) + " blocks. " +
-                                       "Saving pre-respawn location: " + 
-                                       String.format("%.1f, %.1f, %.1f", previousPos.getX(), previousPos.getY(), previousPos.getZ()));
-                            backService.pushDeathLocation(playerId, previousPos);
+                            if (configManager.isDebugEnabled()) {
+                                logger.fine("[DeathTracking] Detected large movement for " + playerId +
+                                        " (" + String.format("%.1f", distance) + " blocks). " +
+                                        "Using this only for internal tracking – NOT saving as death location.");
+                            }
+                            // mark that we've seen a "death cycle" if you still need that flag
                             deathLocationSaved.put(playerId, true);
                         }
-                        
-                        // Reset stable position to new location after respawn
                         stablePositions.put(playerId, newPos.clone());
                     } else {
-                        // Normal movement - update stable position
-                        // Only update stable if movement is small (player is "settled")
                         if (distance < STABLE_MOVEMENT_THRESHOLD) {
                             stablePositions.put(playerId, newPos.clone());
-                            // Reset death saved flag when player is moving normally
                             deathLocationSaved.put(playerId, false);
                         }
                     }
-                } else {
-                    // First position for this player
-                    stablePositions.put(playerId, newPos.clone());
                 }
                 
                 lastKnownPositions.put(playerId, newPos);

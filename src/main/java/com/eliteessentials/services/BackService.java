@@ -64,24 +64,23 @@ public class BackService {
      * @param location Death location
      */
     public void pushDeathLocation(UUID playerId, Location location) {
+        logger.fine("[BackService] pushDeathLocation called for " + playerId + " at " + location);
+
         if (!configManager.isBackOnDeathEnabled()) {
             logger.fine("Back on death disabled in config, not recording death location for " + playerId);
             return;
         }
-        
-        // In advanced permissions mode, check if player has the back.ondeath permission
+
         if (configManager.isAdvancedPermissions()) {
             if (!PermissionService.get().hasPermission(playerId, Permissions.BACK_ONDEATH)) {
-                if (configManager.isDebugEnabled()) {
-                    logger.info("[BackService] Player " + playerId + " lacks " + Permissions.BACK_ONDEATH + " permission, not recording death location");
-                }
+                logger.info("[BackService] Player " + playerId + " lacks " + Permissions.BACK_ONDEATH + " permission, not recording death location");
                 return;
             }
         }
-        
+
         if (configManager.isDebugEnabled()) {
-            logger.info("[BackService] Recording DEATH location for " + playerId + ": " + 
-                String.format("%.1f, %.1f, %.1f", location.getX(), location.getY(), location.getZ()));
+            logger.info("[BackService] Recording DEATH location for " + playerId + ": " +
+                    String.format("%.1f, %.1f, %.1f", location.getX(), location.getY(), location.getZ()));
         }
         pushLocation(playerId, location);
     }
